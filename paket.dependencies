@@ -1,0 +1,21 @@
+framework: net461, netstandard2.0, netcoreapp2.0
+source https://nuget.org/api/v2
+
+nuget FSharp.Core ~> 4.3.4 lowest_matching:true
+nuget System.ValueTuple
+
+nuget Confluent.Kafka ~> 0.11.4 lowest_matching:true
+nuget System.Reactive ~> 4.0 prerelease
+nuget NLog ~> 4.5.4 prerelease
+
+nuget NUnit ~> 3.0
+nuget NUnit3TestAdapter ~> 3.0
+nuget Microsoft.NET.Test.Sdk
+nuget Newtonsoft.Json ~> 11.0
+
+group Build
+  framework: net461
+  source https://nuget.org/api/v2
+  
+  nuget FAKE
+  github fsharp/FAKE modules/Octokit/Octokit.fsx
