@@ -1,5 +1,5 @@
-framework: net461, netstandard2.0, netcoreapp2.0
-source https://nuget.org/api/v2
+framework: net45, netstandard2.0
+source https://api.nuget.org/v3/index.json
 
 nuget FSharp.Core ~> 4.3.4 lowest_matching:true
 nuget System.ValueTuple
@@ -14,8 +14,8 @@ nuget Microsoft.NET.Test.Sdk
 nuget Newtonsoft.Json ~> 11.0
 
 group Build
-  framework: net461
-  source https://nuget.org/api/v2
+  framework: net45
+  source https://api.nuget.org/v3/index.json
   
   nuget FAKE
   github fsharp/FAKE modules/Octokit/Octokit.fsx
