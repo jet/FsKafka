@@ -15,8 +15,6 @@ File: ConfluentKafka.fs
 Your project would need to additionally reference the following nuget dependencies:
 ```
 Confluent.Kafka
-System.Reactive
-NLog
 ```
 
 ## Running Tests
