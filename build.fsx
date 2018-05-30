@@ -124,9 +124,10 @@ Target "Clean" (fun _ ->
 // Build library & test project
 
 Target "Build" (fun _ ->
-    !! solutionFile
-    |> MSBuildReleaseExt "" vsProjProps "Rebuild"
-    |> ignore
+    DotNetCli.Build (fun p -> 
+        { p with 
+            Project = sln ;
+            Configuration = configuration })
 )
 
 // --------------------------------------------------------------------------------------
