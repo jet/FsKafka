@@ -161,6 +161,7 @@ module Config =
         let requestTimeoutMs = config<int> "request.timeout.ms"
         let partitioner (algorithm: Partitioner) = config<string> "partitioner" (enumToString algorithm)
         let messageSendMaxRetries = config<int> "message.send.max.retries"
+        let retryBackoffMs = config<int> "retry.backoff.ms"
 
         /// Safe producer configuration.
         /// - max.inflight = 1
