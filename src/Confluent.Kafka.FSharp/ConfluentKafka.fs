@@ -1,7 +1,6 @@
 ﻿namespace Confluent.Kafka
 
 open System
-open System.Collections.Generic
 open System.Collections.Concurrent
 open System.Text
 open System.Threading
