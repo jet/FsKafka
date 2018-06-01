@@ -1,16 +1,19 @@
-framework: net45, netstandard2.0, netcoreapp2.0
+framework: net45, netstandard2.0
 source https://api.nuget.org/v3/index.json
 
 nuget FSharp.Core ~> 4.3.4 lowest_matching:true
-nuget System.ValueTuple
 nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
-
 nuget Confluent.Kafka ~> 0.11.4 lowest_matching:true
+nuget SourceLink.Create.CommandLine copy_local: true
 
-nuget NUnit ~> 3.0
-nuget NUnit3TestAdapter ~> 3.0
-nuget Microsoft.NET.Test.Sdk
-nuget Newtonsoft.Json ~> 11.0
+group Legacy
+  source https://api.nuget.org/v3/index.json
+  framework: net45
+
+  nuget FSharp.Core >= 3.1 lowest_matching: true
+  nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
+  nuget Confluent.Kafka ~> 0.11.4 lowest_matching:true
+  nuget SourceLink.Create.CommandLine copy_local: true
 
 group Build
   framework: net45
@@ -18,3 +21,15 @@ group Build
   
   nuget FAKE
   github fsharp/FAKE modules/Octokit/Octokit.fsx
+
+group Test
+  source https://api.nuget.org/v3/index.json
+  framework: netcoreapp2.0, net45
+  redirects: force
+
+  nuget FSharp.Core >= 3.1 lowest_matching: true
+  nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
+  nuget NUnit ~> 3.0
+  nuget NUnit3TestAdapter ~> 3.0
+  nuget Confluent.Kafka ~> 0.11.4 lowest_matching:true
+  nuget Microsoft.NET.Test.Sdk

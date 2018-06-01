@@ -391,10 +391,3 @@ module Consumer =
         if buf.Count > 0 then
           yield buf.ToArray()
           buf.Clear () }
-
-  /// Represents repeated calls to Consumer.Consume with the specified timeout as an AsyncSeq.
-  /// Buffers messages into buffers bounded by time and count.
-  /// Partitions buffers by message partition.
-  let streamBufferedPartitioned (c:Consumer) (timeoutMs:int) (batchSize:int) : AsyncSeq<(int * Message[])[]> =
-    streamBuffered c timeoutMs batchSize 
-    |> AsyncSeq.map (Array.groupBy (fun m -> m.Partition))
