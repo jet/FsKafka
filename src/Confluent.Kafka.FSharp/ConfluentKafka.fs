@@ -391,3 +391,82 @@ module Consumer =
         if buf.Count > 0 then
           yield buf.ToArray()
           buf.Clear () }
+
+module Legacy =
+  // Implement ProducerMessage and ProducerResult, ConsumerMessageSet classes and API to be more backward compatible with kafunk.
+  module Binary =
+    let empty = ArraySegment<byte>()
+    let inline ofArray (bytes : byte[]) : ArraySegment<byte> = ArraySegment(bytes, 0, bytes.Length)
+
+  type ProducerMessage =
+    struct
+      /// The message payload.
+      val value : ArraySegment<byte>
+      /// The optional message key.
+      val key : ArraySegment<byte>
+      new (value:ArraySegment<byte>, key:ArraySegment<byte>) =
+        { value = value ; key = key }
+    end
+      with
+
+        /// Creates a producer message.
+        static member ofBytes (value:ArraySegment<byte>, ?key) =
+          ProducerMessage(value, defaultArg key Binary.empty)
+
+        /// Creates a producer message.
+        static member ofBytes (value:byte[], ?key) =
+          let keyBuf = defaultArg (key |> Option.map Binary.ofArray) Binary.empty
+          ProducerMessage(Binary.ofArray value, keyBuf)
+
+        /// Creates a producer message.
+        static member ofString (value:string, ?key:string) =
+          let keyBuf = defaultArg (key |> Option.map (Encoding.UTF8.GetBytes >> Binary.ofArray)) Binary.empty
+          ProducerMessage(Binary.ofArray (Encoding.UTF8.GetBytes value), keyBuf)
+
+        /// Returns the size, in bytes, of the message.
+        static member internal size (m:ProducerMessage) =
+          m.key.Count + m.value.Count
+
+  type ProducerResult =
+    struct
+      /// The partition to which the message was written.
+      val partition : int32
+
+      /// The offset of the first message produced to the partition.
+      val offset : Offset
+
+      /// The number of messages in the produced batch for the partition.
+      val count : int
+
+      new (p,o,c) = { partition = p ; offset = o ; count = c }
+    end
+
+  let produceBatched (p:Producer) (topic: string) (batch:ProducerMessage seq) : Async<ProducerResult[]> = async {
+    let segmentToArray (segment: ArraySegment<byte>) = 
+      if segment.Count = segment.Array.Length then
+        segment.Array
+      else
+        let arr = Array.zeroCreate(segment.Count)
+        Array.Copy(segment.Array, segment.Offset, arr, 0, segment.Count)
+        arr
+
+    let ms = 
+      batch
+      |> Seq.map(fun pm ->
+        let key = segmentToArray pm.key
+        let value = segmentToArray pm.value
+        (key, value)
+      )
+      |> Array.ofSeq
+
+    let! messages = Producer.produceBatchedBytes p topic ms
+    
+    let ret = 
+      messages
+      |> Array.groupBy(fun m -> (m.Partition, m.Offset))
+      |> Array.map(fun ((part, offs), vals) ->
+        new ProducerResult(part, offs, vals.Length)
+      )
+
+    return ret
+  }
