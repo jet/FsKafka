@@ -1,19 +1,18 @@
 # Confluent.Kafka.FSharp
 
-An thin, F# friendly wrapper for Confluent.Kafka, designed for compatibility with the Kafunk API.
+F# friendly wrapper for Confluent.Kafka, designed for compatibility with the Kafunk API.
 
 ## Using the wrapper
 
 To incorporate the wrapper in your project place the following line in your paket.dependencies file:
 ```
 github jet/confluent-kafka-fsharp:<commit hash> src/Confluent.Kafka.FSharp/ConfluentKafka.fs
+nuget Confluent.Kafka
+
 ```
 and in paket.references:
 ```
 File: ConfluentKafka.fs
-```
-Your project would need to additionally reference the following nuget dependencies:
-```
 Confluent.Kafka
 ```
 
@@ -21,15 +20,13 @@ Confluent.Kafka
 
 Make sure you set the `CONFLUENT_KAFKA_TEST_BROKER` environment variable to an appropriate kafka broker before running the tests.
 
-## Desired features from C# driver
-* Producer support of asynchronous buffer overflow (pushback)
-* Consumer: support of asynchronous message handler
-
 ## Differences with kafunk
 ### Conceptual changes
 Because differences between kafunk and confluent can not be masked reasonably cheap, there are some differences in behaviour. Creating a client is now synchronous process and actual connect to brokers will happen upon first request whereas in kafunk it was during create call.
 
-Configuration is reflecting confluent/java API closer and does not have separate channel configuration anymore.
+Configuration changes require the most rework beacuse it is reflecting confluent/java API and does not have separate channel and kafka configuration anymore.
+Kafka connection object is not exposed by confluent as a standalone object.
+Low-level API such as Fetch Request is not exposed by Confluent too.
 
 Confluent's driver has some settings by default, which does not guarantee "at least once" or "in-order" delivery. See Configuration below to start with safe settings.
 
@@ -91,3 +88,9 @@ But if you write a tool and need to set all partitions to certain offset, there 
 
 Note: you might want to discard assigned topicPartitionList, if you want to be confident that you have received all partitions.
 
+## Wrapper vs using Confluent kafka directly
+Wrapper address the following concerns:
+* Provide Confluent client configured with safe defaults ("at least once" and in-order delivery)
+* "Legacy" module which mimic kafunk API as much as possible
+
+If you know what you are doing, you are free to use Confluent Kafka directly, just be ready to spend some time on learning its safe configurations (there is lack of documentation, most info is in github issues).
