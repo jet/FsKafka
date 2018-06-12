@@ -392,6 +392,36 @@ module Consumer =
           yield buf.ToArray()
           buf.Clear () }
 
+  /// Query low and high watermaks from broker
+  let offsetRange (host: string) (topic:string) (partitions:int seq) : Async<Map<int, int64 * int64>> = async {
+    let config = 
+      Config.Consumer.safe
+      |> Config.bootstrapServers host
+    use consumer = new Consumer(config)
+
+    // Get list of all partitions of given topic
+    let partitions = 
+      if partitions |> Seq.isEmpty then
+        (
+          consumer.GetMetadata(true, TimeSpan.FromSeconds(20.0)).Topics
+          |> Seq.filter(fun t -> t.Topic = topic)
+          |> Seq.head
+        ).Partitions
+        |> Seq.map(fun p -> p.PartitionId)
+      else
+        partitions
+
+
+    return 
+      partitions
+      |> Seq.map(fun p -> 
+        let tp = new TopicPartition(topic, p)
+        let watermark = consumer.QueryWatermarkOffsets(tp)
+        (p, (watermark.Low.Value, watermark.High.Value))
+      )
+      |> Map.ofSeq
+  }
+
 module Legacy =
   // Implement ProducerMessage and ProducerResult, ConsumerMessageSet classes and API to be more backward compatible with kafunk.
   module Binary =
