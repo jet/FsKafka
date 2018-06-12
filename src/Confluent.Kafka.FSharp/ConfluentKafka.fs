@@ -398,6 +398,9 @@ module Legacy =
     let empty = ArraySegment<byte>()
     let inline ofArray (bytes : byte[]) : ArraySegment<byte> = ArraySegment(bytes, 0, bytes.Length)
 
+  //
+  // Producer
+  //
   type ProducerMessage =
     struct
       /// The message payload.
@@ -471,3 +474,25 @@ module Legacy =
 
     return ret
   }
+
+  //
+  // Consumer
+  //
+  type LegacyConfigDefaults = {
+    pullTimeoutMs: int
+    batchLingerMs: int
+    batchSize: int
+  }
+
+  type Consumer with
+    /// Some configuration settings did not exist in kafunk consumer, such as 
+    /// pullTimeoutMs, batchLingerMs and batchSize (in producer) but are required in Confluent API. 
+    /// To make transition easier, this property holds default values, which allow to mimic kafunk API.
+    member this.LegacyConfigDefaults = {pullTimeoutMs = 300; batchLingerMs = 300; batchSize = 10000}
+
+  let consume 
+    (c:Consumer)
+    (handler: ConsumerMessageSet -> Async<unit>) 
+    : Async<unit> = 
+      Consumer.consume c (c.LegacyConfigDefaults.pullTimeoutMs) (c.LegacyConfigDefaults.batchLingerMs) (c.LegacyConfigDefaults.batchSize) handler
+    
