@@ -463,10 +463,11 @@ module Legacy =
     
     let ret = 
       messages
-      |> Array.groupBy(fun m -> (m.Partition, m.Offset))
-      |> Array.map(fun ((part, offs), vals) ->
-        new ProducerResult(part, offs, vals.Length)
+      |> Seq.groupBy(fun m -> (m.Partition, m.Offset))
+      |> Seq.map(fun ((part, offs), vals) ->
+        new ProducerResult(part, offs, Seq.length vals)
       )
+      |> Array.ofSeq
 
     return ret
   }
