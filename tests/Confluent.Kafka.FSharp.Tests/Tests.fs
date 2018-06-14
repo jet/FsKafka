@@ -189,5 +189,115 @@ let ``Message ordering is preserved``() =
 
         Assert.AreEqual(messageCount, count)
 
+[<Test>]
+[<Category("Wrapper")>]
+let ``Offsets do not advance until a message is handled`` () =
+    let host =
+        match Environment.GetEnvironmentVariable "CONFLUENT_KAFKA_TEST_BROKER" with
+        | x when String.IsNullOrWhiteSpace x -> "localhost"
+        | brokers -> brokers
+    let topic = "test-topic-conf-ofsts-dont-advn"
+    let groupId = "test-group-conf-ofsts-dont-advn"
 
+    use producer =
+      Config.Producer.safe
+      |> Config.bootstrapServers host
+      |> Config.clientId "test-client"
+      |> Producer.create
 
+    let publishOne key'value =
+      let producedMsg =
+        Confluent.Kafka.Producer.produceString producer topic key'value
+        |> Async.RunSynchronously
+      Assert.False (producedMsg.Error.HasError, "Failed to publish to topic" + producedMsg.Error.ToString())
+      Console.WriteLine ("Published message at partition: {0}, offset: {1}", producedMsg.Partition,  producedMsg.Offset)
+
+    let consumeDuration = TimeSpan.FromSeconds(10.)
+    let commitInterval = consumeDuration.TotalMilliseconds / 4.
+
+    use consumer =
+      Config.Consumer.safe
+      |> Config.bootstrapServers host
+      |> Config.Consumer.groupId groupId
+      |> Config.clientId "test-client"
+      |> Config.Consumer.Topic.autoOffsetReset Config.Consumer.Topic.End
+      |> Config.Consumer.commitIntervalMs (int commitInterval)
+      |> Config.Consumer.enableAutoCommit true
+      |> Consumer.create
+
+    // Create topic if not exists
+    do publishOne ("key", "init")
+
+    // Advance offsets to the end of the topic
+    let initialHighWatermark =
+      let committedOffsets =
+        consumer.GetMetadata(true).Topics
+        |> Seq.filter (fun m -> m.Topic = topic)
+        |> Seq.collect (fun m -> m.Partitions)
+        |> Seq.map (fun p ->
+          let watermark =
+            (topic, p.PartitionId)
+            |> TopicPartition
+            |> consumer.QueryWatermarkOffsets
+
+          new TopicPartitionOffset(topic, p.PartitionId, watermark.High))
+        |> consumer.CommitAsync
+        |> Async.AwaitTask
+        |> Async.RunSynchronously
+
+      do
+        committedOffsets.Offsets
+        |> Seq.filter (fun co -> co.Error.HasError)
+        |> Seq.map (fun co -> co.Partition)
+        |> Assert.IsEmpty
+
+      do Assert.False(committedOffsets.Error.HasError, "COMMIT: " + committedOffsets.Error.ToString())
+
+      committedOffsets.Offsets
+      |> Seq.map (fun x -> (x.Topic, x.Partition), x.Offset )
+      |> Map.ofSeq
+
+    // Publish one more message which we intend to consume
+    do publishOne ("key", "read me")
+
+    // And another that we don't
+    do publishOne ("key", "don't read me")
+
+    do consumer.Subscribe topic
+
+    let commitCounter = ref 0
+    let offsetDelta = ref 0L
+
+    consumer.OnOffsetsCommitted
+    |> Event.add (fun cm ->
+      do Interlocked.Increment(commitCounter) |> ignore
+
+      do Assert.False cm.Error.HasError
+
+      cm.Offsets
+      |> Seq.iter (fun tpoe ->
+        let initOffset = Map.find (tpoe.Topic, tpoe.Partition) initialHighWatermark
+        if tpoe.Offset.IsSpecial then
+          Console.WriteLine ("Skipping comparison for special offset, partition {0}", tpoe.Partition)
+        else
+          let newDelta = Interlocked.Add(offsetDelta, (tpoe.Offset.Value - initOffset.Value))
+          Assert.AreEqual (1L, newDelta, "Committed offsets should not advance by more than 1!"))
+      )
+
+    let cancel = new CancellationTokenSource(consumeDuration)
+
+    let mutable consumeCount = 0
+    let consumeProcess = Consumer.consume consumer 100 100 1 (fun _ -> async {
+      if consumeCount = 0 then
+        consumeCount <- consumeCount + 1
+      else
+        // Don't actually process the message, but sleep for twice the consume duration
+        let sleepDuration = consumeDuration.Add(consumeDuration)
+        do! Async.Sleep (int sleepDuration.TotalMilliseconds)
+        failwith "Did not sleep long enough"
+      return () })
+
+    try
+      do Async.RunSynchronously (consumeProcess, cancellationToken = cancel.Token)
+    with
+      | :? OperationCanceledException -> Assert.Greater (!commitCounter, 0, "No periodic commits happened")
