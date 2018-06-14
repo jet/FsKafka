@@ -26,7 +26,7 @@ Because differences between kafunk and confluent can not be masked reasonably ch
 
 Configuration changes require the most rework beacuse it is reflecting confluent/java API and does not have separate channel and kafka configuration anymore.
 Kafka connection object is not exposed by confluent as a standalone object.
-Low-level API such as Fetch Request is not exposed by Confluent too.
+Low-level API such as Fetch Request or protocol-level Kafka message size is not exposed by Confluent too.
 
 Confluent's driver has some settings by default, which does not guarantee "at least once" or "in-order" delivery. See Configuration below to start with safe settings.
 
@@ -62,31 +62,7 @@ https://github.com/confluentinc/confluent-kafka-dotnet/blob/57192f3122569de25784
 Confluent driver has Consumer.OnPartitionsAssigned event. In this event you are provided with `List<TopicPartition>` which your consumer is assigned. Note, there are no offsets. The idea is that by default, in this handler you would call `Consumer.Assign` with provided list and driver will figure out last committed offsets for you:
 https://github.com/confluentinc/confluent-kafka-dotnet/blob/57192f3122569de257841b4057ea79ad4107ce10/examples/AdvancedConsumer/Program.cs#L88
 
-But if you write a tool and need to set all partitions to certain offset, there is another override to `Consumer.Assign`, which takes `List<TopicPartitionOffset>`. Or, if you want to set offsets but are not intendent to consume, call `Consumer.CommitAsync` For example:
-```
-    consumer.OnPartitionsAssigned
-    |> Event.add(fun _tps ->
-      //
-      // Get all partitions
-      //
-      let customOffsets = 
-        consumer.GetMetadata(true).Topics
-        |> Seq.filter(fun m -> m.Topic = myTopic)
-        |> Seq.collect(fun m -> m.Partitions)
-        |> Seq.map(fun p -> 
-          let myOffset = someCusomLogic(myTopic, p.PartitionId)
-          // Also, you can use special offset values for example:
-          // let myOffset = Offset.Beginning
-          new TopicPartitionOffset(myTopic, p.PartitionId, myOffset) 
-        )
-      consumer.CommitAsync(customOffsets)
-      |> Async.AwaitTask
-      // Or, if you want to actually consume from positions, replace 2 lines abive with:
-      // consumer.Assign(customOffsets)
-      ...
-```
-
-Note: you might want to discard assigned topicPartitionList, if you want to be confident that you have received all partitions.
+But if you write a tool and need to set all partitions to certain offset, there is another override to `Consumer.Assign`, which takes `List<TopicPartitionOffset>`. Or, if you want to set offsets but are not intendent to consume, call `Consumer.CommitAsync` For example, [see this script](./src/Confluent.Kafka.FSharp/Script.fsx):
 
 ## Wrapper vs using Confluent kafka directly
 Wrapper address the following concerns:

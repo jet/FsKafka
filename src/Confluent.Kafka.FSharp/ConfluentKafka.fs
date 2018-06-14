@@ -10,7 +10,7 @@ open FSharp.Control
 
 [<AutoOpen>]
 module internal Prelude =
-  
+
   let inline isNull (x:obj) = obj.ReferenceEquals (x,null)
 
   let inline arrayToSegment (xs:'a[]) : ArraySegment<'a> =
@@ -21,18 +21,18 @@ module internal Prelude =
     else Encoding.UTF8.GetBytes s |> arrayToSegment
 
   type Async with
-    static member AwaitTaskCancellationAsError (t:Task<'a>) : Async<'a> = 
+    static member AwaitTaskCancellationAsError (t:Task<'a>) : Async<'a> =
         Async.FromContinuations <| fun (ok,err,_) ->
           t.ContinueWith ((fun (t:Task<'a>) ->
             if t.IsFaulted then err t.Exception
             elif t.IsCanceled then err (OperationCanceledException("Task wrapped with Async has been cancelled."))
             elif t.IsCompleted then ok t.Result
-            else failwith "unreachable")) |> ignore 
+            else failwith "unreachable")) |> ignore
 
 /// Operations on messages.
 [<CompilationRepresentationAttribute(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal Message =
-  
+
   let internal errorMessage (m:Message) (e:Error) =
     sprintf "message_error|topic=%s partition=%i offset=%i code=%O reason=%s" m.Topic m.Partition m.Offset.Value e.Code e.Reason
 
@@ -73,24 +73,24 @@ module Config =
         | All
 
     //
-    // Non-typed 
+    // Non-typed
     //
     let remove = Map.remove
     let config<'v> k (v: 'v) config = Map.add k (box v) config
-    
+
     let configMap<'v> name k (v: 'v) (config: Map<string,obj>): Map<string,obj> =
         match config.TryFind name with
-            | Some mapObj -> 
+            | Some mapObj ->
                 match mapObj with
                     | :? Map<string,obj> as map' ->
                         Map.add name (box (Map.add k (box v) map')) config
                     | _ -> failwithf "Expected config '%s' to be map but got %s" name (mapObj.GetType().Name)
-            | None -> 
+            | None ->
                 Map.add name (box (Map([(k,box v)]))) config
-    
+
     let configs configs map = List.fold (fun m (k, v) -> config k v m) map configs
-    let debug (debugFlag: seq<DebugFlags.DebugFlag>) configs = 
-      let str = 
+    let debug (debugFlag: seq<DebugFlags.DebugFlag>) configs =
+      let str =
         debugFlag
         |> Seq.map enumToString
         |> String.concat ","
@@ -112,27 +112,26 @@ module Config =
         let heartbeatInterval = config<int> "heartbeat.interval.ms"
         let sessionTimeout = config<int> "session.timeout.ms"
         let commitIntervalMs = config<int> "auto.commit.interval.ms"
-        
+
         module Topic =
             type AutoOffsetReset =
                 | Beginning
                 | End
                 | Error
-            
+
             let autoOffsetReset (reset: AutoOffsetReset) = configMap<string> "default.topic.config" "auto.offset.reset" (enumToString reset)
 
-        let safe = 
+        let safe =
             Map.empty
             |> Topic.autoOffsetReset Topic.Error
             // Wrapper will store offsets, do not let librdkafka do it:
             // https://github.com/confluentinc/confluent-kafka-dotnet/issues/527
             |> config "enable.auto.offset.store" false
 
-
     module Producer =
         type Compression =
-            | None 
-            | Gzip 
+            | None
+            | Gzip
             | Snappy
             | Lz4
 
@@ -148,9 +147,9 @@ module Config =
             | Murmur2
             | Murmur2_Random
 
-        let maxInFlight = config "max.in.flight.requests.per.connection" 
+        let maxInFlight = config "max.in.flight.requests.per.connection"
         let lingerMs = config<int> "linger.ms"
-        let requiredAcks (acks: RequiredAcks) = 
+        let requiredAcks (acks: RequiredAcks) =
             match acks with
                 | All -> -1
                 | None -> 0
@@ -175,11 +174,11 @@ module Config =
 /// Operations on producers.
 [<CompilationRepresentationAttribute(CompilationRepresentationFlags.ModuleSuffix)>]
 module Producer =
-  
+
   /// Creates a producer.
   let create (config: Map<string,obj>) =
     let producer = new Producer(config, false, false)
-    producer    
+    producer
 
   let onLog logger (producer: Producer) =
     producer.OnLog
@@ -193,7 +192,7 @@ module Producer =
     let tcs = TaskCompletionSource<Message[]>()
     let rs = Array.zeroCreate expectedMessageCount
     let mutable i = -1
-    let handler = 
+    let handler =
       { new IDeliveryHandler with
           member __.HandleDeliveryReport m =
             if throwOnError && m.Error.HasError then
@@ -244,7 +243,6 @@ module Producer =
     let ms = ms |> Array.map (fun (k,v) -> stringToSegment k, stringToSegment v)
     produceBatched p topic ms
 
-
 /// A set of messages from a single partition.
 type ConsumerMessageSet = {
   topic : string
@@ -277,30 +275,30 @@ module Consumer =
   /// @pollTimeoutMs - the consumer poll timeout.
   /// @batchLingerMs - the time to wait to form a per-partition batch; when time limit is reached the handler is called.
   /// @batchSize - the per-partition batch size limit; when the limit is reached, the handler is called.
-  let consume 
-    (c:Consumer) 
+  let consume
+    (c:Consumer)
     (pollTimeoutMs:int)
-    (batchLingerMs:int) 
-    (batchSize:int) 
+    (batchLingerMs:int)
+    (batchSize:int)
     (handle:ConsumerMessageSet -> Async<unit>) : Async<unit> = async {
     let! externalCancel = Async.CancellationToken
     use localCancel = CancellationTokenSource.CreateLinkedTokenSource externalCancel
-    let tcs = TaskCompletionSource<unit>()    
-    let queues = ConcurrentDictionary<string * int, BlockingCollection<Message>>()    
+    let tcs = TaskCompletionSource<unit>()
+    let queues = ConcurrentDictionary<string * int, BlockingCollection<Message>>()
     let close () =
       for kvp in queues do
         try kvp.Value.CompleteAdding() with _ -> ()
-    
+
     // If task is finished (due to exception), cancel the token
     tcs.Task.ContinueWith(fun (_:Task<unit>) -> localCancel.Cancel()) |> ignore
     // If cancellation token triggers, cancel the task
-    use _ = localCancel.Token.Register(fun () -> 
+    use _ = localCancel.Token.Register(fun () ->
         c.Unsubscribe()
         close()
         tcs.TrySetCanceled() |> ignore
     )
 
-    let consumePartition (t:string, p:int) (queue:BlockingCollection<Message>) = async {      
+    let consumePartition (t:string, p:int) (queue:BlockingCollection<Message>) = async {
       try
         use queue = queue
         do!
@@ -309,12 +307,12 @@ module Consumer =
           |> AsyncSeq.bufferByCountAndTime batchSize batchLingerMs
           |> AsyncSeq.iterAsync (fun ms -> async {
             let! res = handle { ConsumerMessageSet.topic = t ; partition = p ; messages = ms }
-            // Update driver's internal position pointer (will be flushed periodically in accordance to 
+            // Update driver's internal position pointer (will be flushed periodically in accordance to
             // "auto.commit.interval.ms"
             let maxOffsetMsg = ms |> Seq.maxBy (fun msg -> msg.Offset.Value)
-            let position = 
+            let position =
               new TopicPartitionOffset(
-                maxOffsetMsg.TopicPartition, 
+                maxOffsetMsg.TopicPartition,
                 new Offset(maxOffsetMsg.Offset.Value + 1L))
             c.StoreOffsets([|position|]) |> ignore
             return res
@@ -331,9 +329,9 @@ module Consumer =
             buf.Add m
             // drain in-memory buffer
             while c.Consume(&m, 0) && (not localCancel.Token.IsCancellationRequested) do
-              Message.throwIfError m  
+              Message.throwIfError m
               buf.Add m
-            buf 
+            buf
             |> Seq.groupBy (fun m -> m.Topic,m.Partition)
             |> Seq.toArray
             |> Array.Parallel.iter (fun (tp,ms) ->
@@ -350,7 +348,6 @@ module Consumer =
 
     Async.Start (poll, localCancel.Token)
     try return! tcs.Task |> Async.AwaitTaskCancellationAsError finally close () }
-
 
   let onLog logger (consumer: Consumer) =
     consumer.OnLog
@@ -377,7 +374,7 @@ module Consumer =
     let buf = ResizeArray<_>()
     while true do
       let now = DateTime.UtcNow
-      let dt = int (now - last).TotalMilliseconds      
+      let dt = int (now - last).TotalMilliseconds
       let timeoutMs = max (timeoutMs - dt) 0
       if timeoutMs > 0 && c.Consume(&m, timeoutMs) then
         last <- now
@@ -394,13 +391,15 @@ module Consumer =
 
   /// Query low and high watermaks from broker
   let offsetRange (host: string) (topic:string) (partitions:int seq) : Async<Map<int, int64 * int64>> = async {
-    let config = 
+    let config =
       Config.Consumer.safe
       |> Config.bootstrapServers host
+      |> Config.Consumer.groupId "offset-fetcher"
+      |> Config.Consumer.enableAutoCommit false
     use consumer = new Consumer(config)
 
     // Get list of all partitions of given topic
-    let partitions = 
+    let partitions =
       if partitions |> Seq.isEmpty then
         (
           consumer.GetMetadata(true, TimeSpan.FromSeconds(20.0)).Topics
@@ -411,10 +410,9 @@ module Consumer =
       else
         partitions
 
-
-    return 
+    return
       partitions
-      |> Seq.map(fun p -> 
+      |> Seq.map(fun p ->
         let tp = new TopicPartition(topic, p)
         let watermark = consumer.QueryWatermarkOffsets(tp)
         (p, (watermark.Low.Value, watermark.High.Value))
@@ -475,7 +473,7 @@ module Legacy =
     end
 
   let produceBatched (p:Producer) (topic: string) (batch:ProducerMessage seq) : Async<ProducerResult[]> = async {
-    let segmentToArray (segment: ArraySegment<byte>) = 
+    let segmentToArray (segment: ArraySegment<byte>) =
       if segment.Count = segment.Array.Length then
         segment.Array
       else
@@ -483,7 +481,7 @@ module Legacy =
         Array.Copy(segment.Array, segment.Offset, arr, 0, segment.Count)
         arr
 
-    let ms = 
+    let ms =
       batch
       |> Seq.map(fun pm ->
         let key = segmentToArray pm.key
@@ -493,8 +491,8 @@ module Legacy =
       |> Array.ofSeq
 
     let! messages = Producer.produceBatchedBytes p topic ms
-    
-    let ret = 
+
+    let ret =
       messages
       |> Seq.groupBy(fun m -> (m.Partition, m.Offset))
       |> Seq.map(fun ((part, offs), vals) ->
@@ -515,14 +513,13 @@ module Legacy =
   }
 
   type Consumer with
-    /// Some configuration settings did not exist in kafunk consumer, such as 
-    /// pullTimeoutMs, batchLingerMs and batchSize (in producer) but are required in Confluent API. 
+    /// Some configuration settings did not exist in kafunk consumer, such as
+    /// pullTimeoutMs, batchLingerMs and batchSize (in producer) but are required in Confluent API.
     /// To make transition easier, this property holds default values, which allow to mimic kafunk API.
     member this.LegacyConfigDefaults = {pullTimeoutMs = 300; batchLingerMs = 300; batchSize = 10000}
 
-  let consume 
+  let consume
     (c:Consumer)
-    (handler: ConsumerMessageSet -> Async<unit>) 
-    : Async<unit> = 
+    (handler: ConsumerMessageSet -> Async<unit>)
+    : Async<unit> =
       Consumer.consume c (c.LegacyConfigDefaults.pullTimeoutMs) (c.LegacyConfigDefaults.batchLingerMs) (c.LegacyConfigDefaults.batchSize) handler
-    
