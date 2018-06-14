@@ -26,7 +26,7 @@ Because differences between kafunk and confluent can not be masked reasonably ch
 
 Configuration changes require the most rework beacuse it is reflecting confluent/java API and does not have separate channel and kafka configuration anymore.
 Kafka connection object is not exposed by confluent as a standalone object.
-Low-level API such as Fetch Request is not exposed by Confluent too.
+Low-level API such as Fetch Request or protocol-level Kafka message size is not exposed by Confluent too.
 
 Confluent's driver has some settings by default, which does not guarantee "at least once" or "in-order" delivery. See Configuration below to start with safe settings.
 
