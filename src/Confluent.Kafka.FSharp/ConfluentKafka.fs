@@ -393,9 +393,9 @@ module Consumer =
   let offsetRange (host: string) (topic:string) (partitions:int seq) : Async<Map<int, int64 * int64>> = async {
     let config =
       Config.Consumer.safe
-      |> Config.Consumer.groupId "offset-fetcher"
       |> Config.bootstrapServers host
-      |> Config.config "enable.auto.commit" false
+      |> Config.Consumer.groupId "offset-fetcher"
+      |> Config.Consumer.enableAutoCommit false
     use consumer = new Consumer(config)
 
     // Get list of all partitions of given topic
