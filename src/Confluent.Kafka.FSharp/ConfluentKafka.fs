@@ -397,6 +397,7 @@ module Consumer =
     let config = 
       Config.Consumer.safe
       |> Config.bootstrapServers host
+      |> Config.config "enable.auto.commit" false
     use consumer = new Consumer(config)
 
     // Get list of all partitions of given topic
