@@ -142,15 +142,6 @@ let ``Message ordering is preserved``() =
         )
       }) 
 
-    let meta = 
-      consumer.GetMetadata(true, TimeSpan.FromSeconds(40.0)).Topics
-      |> Seq.find(fun t -> t.Topic = topic)
-    let offsets =
-      meta.Partitions |> Seq.map(fun p -> new TopicPartition(topic, p.PartitionId))
-      |> Seq.map(fun tp -> (tp.Partition, consumer.QueryWatermarkOffsets(tp).High.Value))
-      |> Map.ofSeq
-    Debug.WriteLine("Offsets: {0}", offsets)
-
     consumer.OnPartitionsAssigned
     |> Event.add (
       fun partitions -> 
