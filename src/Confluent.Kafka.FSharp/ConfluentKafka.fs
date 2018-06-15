@@ -305,8 +305,8 @@ module Consumer =
           queue.GetConsumingEnumerable ()
           |> AsyncSeq.ofSeq
           |> AsyncSeq.bufferByCountAndTime batchSize batchLingerMs
-          |> AsyncSeq.iterAsync (fun ms ->
-            let res = handle { ConsumerMessageSet.topic = t ; partition = p ; messages = ms }
+          |> AsyncSeq.iterAsync (fun ms -> async {
+            let! res = handle { ConsumerMessageSet.topic = t ; partition = p ; messages = ms }
             // Update driver's internal position pointer (will be flushed periodically in accordance to
             // "auto.commit.interval.ms"
             let maxOffsetMsg = ms |> Seq.maxBy (fun msg -> msg.Offset.Value)
@@ -315,8 +315,8 @@ module Consumer =
                 maxOffsetMsg.TopicPartition,
                 new Offset(maxOffsetMsg.Offset.Value + 1L))
             c.StoreOffsets([|position|]) |> ignore
-            res
-          )
+            return res
+          })
       with ex ->
         tcs.TrySetException ex |> ignore }
     let poll = async {
