@@ -52,7 +52,9 @@ module internal Message =
 
 /// Kafka client configuration.
 module Config =
-    let private enumToString e = e.ToString().ToLower()
+    let private enumToString e =
+      match Microsoft.FSharp.Reflection.FSharpValue.GetUnionFields (e, e.GetType()) with
+      | case, _ -> case.Name.ToLower()
 
     module DebugFlags =
       type DebugFlag =
