@@ -525,3 +525,109 @@ module Legacy =
     (handler: ConsumerMessageSet -> Async<unit>)
     : Async<unit> =
       Consumer.consume c (c.LegacyConfigDefaults.pullTimeoutMs) (c.LegacyConfigDefaults.batchLingerMs) (c.LegacyConfigDefaults.batchSize) handler
+
+  /// Progress information for a consumer in a group.
+  type ConsumerProgressInfo = {
+
+    /// The consumer group id.
+    group : string
+
+    /// The topic.
+    topic : string
+
+    /// Progress info for each partition.
+    partitions : ConsumerPartitionProgressInfo[]
+
+    /// The total lag across all partitions.
+    totalLag : int64
+
+    /// The minimum lead across all partitions.
+    minLead : int64
+
+  }
+
+  /// Progress information for a consumer in a group, for a specific topic-partition.
+  and ConsumerPartitionProgressInfo = {
+
+    /// The partition.
+    partition : int
+
+    /// The consumer's current offset.
+    consumerOffset : Offset
+
+    /// The offset at the current start of the topic.
+    earliestOffset : Offset
+
+    /// The offset at the current end of the topic.
+    highWatermarkOffset : Offset
+
+    /// The distance between the high watermark offset and the consumer offset.
+    lag : int64
+
+    /// The distance between the consumer offset and the earliest offset.
+    lead : int64
+
+    /// The number of messages in the partition.
+    messageCount : int64
+
+  }
+
+
+  /// Operations for providing consumer progress information.
+  module ConsumerInfo =
+
+    /// Returns consumer progress information.
+    /// Passing empty set of partitions returns information for all partitions.
+    let progress (consumer:Consumer) (topic:string) (ps:int[]) = async {    
+      let! topicPartitions = 
+        if ps |> Array.isEmpty then
+          async {            
+            let meta =
+              consumer.GetMetadata(false, TimeSpan.FromSeconds(40.0)).Topics
+              |> Seq.find(fun t -> t.Topic = topic)
+
+            return
+              meta.Partitions
+              |> Seq.map(fun p -> new TopicPartition(topic, p.PartitionId))
+               }
+        else 
+          async { return ps |> Seq.map(fun p -> new TopicPartition(topic,p)) }
+                    
+      let committedOffsets =
+        consumer.Committed(topicPartitions, TimeSpan.FromSeconds(20.))
+        |> Seq.sortBy(fun e -> e.Partition)
+      
+      let! watermarkOffsets =
+        topicPartitions
+          |> Seq.map(fun tp -> async {
+            return tp.Partition, consumer.QueryWatermarkOffsets(tp)}
+          )
+          |> Async.Parallel
+
+      let partitions =
+        watermarkOffsets
+        |> Seq.sortBy fst
+        |> Seq.zip committedOffsets
+        |> Seq.map(fun (tpo,(p,wm)) ->
+          let o,l,e = tpo.Offset.Value,wm.High.Value,wm.Low.Value
+          let lag, lead =
+            match o with
+            | -1L -> l - e, 0L
+            | _ -> l - o, o - e
+          {
+            partition = p
+            consumerOffset = tpo.Offset
+            earliestOffset = wm.Low
+            highWatermarkOffset = wm.High
+            lag = lag
+            lead = lead
+            messageCount = l - e }
+        )        
+        |> Seq.toArray
+      return 
+        {
+        topic = topic ; group = consumer.Name ; partitions = partitions ;
+        totalLag = partitions |> Seq.sumBy (fun p -> p.lag)
+        minLead =
+          if partitions.Length > 0 then partitions |> Seq.map (fun p -> p.lead) |> Seq.min
+          else -1L }}
