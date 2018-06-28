@@ -650,5 +650,6 @@ module Legacy =
         topic = topic ; group = consumer.Name ; partitions = partitions ;
         totalLag = partitions |> Seq.sumBy (fun p -> p.lag)
         minLead =
-          if partitions.Length > 0 then partitions |> Seq.map (fun p -> p.lead) |> Seq.min
+          if partitions.Length > 0 then 
+            partitions |> Seq.map (fun p -> p.lead) |> Seq.min
           else -1L }}
