@@ -544,7 +544,7 @@ module Legacy =
     /// The consumer group id.
     group : string
 
-    /// The topic.
+    /// The name of the kafka topic.
     topic : string
 
     /// Progress info for each partition.
@@ -561,7 +561,7 @@ module Legacy =
   /// Progress information for a consumer in a group, for a specific topic-partition.
   and ConsumerPartitionProgressInfo = {
 
-    /// The partition.
+    /// The partition id within the topic.
     partition : int
 
     /// The consumer's current offset.
