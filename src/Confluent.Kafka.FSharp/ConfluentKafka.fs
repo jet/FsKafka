@@ -22,10 +22,10 @@ module internal Prelude =
 
   module Map =
 
-    let mergeChoice (f:'a -> Choice<'b * 'c, 'b, 'c> -> 'd) (a:Map<'a, 'b>) (b:Map<'a, 'c>) : Map<'a, 'd> =
-      Set.union (a |> Seq.map (fun k -> k.Key) |> set) (b |> Seq.map (fun k -> k.Key) |> set)
+    let mergeChoice (f:'a -> Choice<'b * 'c, 'b, 'c> -> 'd) (map1:Map<'a, 'b>) (map2:Map<'a, 'c>) : Map<'a, 'd> =
+      Set.union (map1 |> Seq.map (fun k -> k.Key) |> set) (map2 |> Seq.map (fun k -> k.Key) |> set)
       |> Seq.map (fun k ->
-        match Map.tryFind k a, Map.tryFind k b with
+        match Map.tryFind k map1, Map.tryFind k map2 with
         | Some b, Some c -> k, f k (Choice1Of3 (b,c))
         | Some b, None   -> k, f k (Choice2Of3 b)
         | None,   Some c -> k, f k (Choice3Of3 c)
@@ -641,7 +641,9 @@ module Legacy =
             let o = -1L
             { partition = p ; consumerOffset = Offset(o) ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
             //failwithf "unable to find consumer offset for topic=%s partition=%i" topic p
-          | Choice3Of3 o -> failwithf "unable to find topic offset for topic=%s partition=%i [consumer_offset=%i]" topic p o.Offset.Value)
+          | Choice3Of3 o -> 
+            let invalid = Offset.Invalid
+            { partition = p ; consumerOffset = o.Offset ; earliestOffset = invalid ; highWatermarkOffset = invalid ; lag = invalid.Value ; lead = invalid.Value ; messageCount = -1L })
         |> Seq.map (fun kvp -> kvp.Value)
         |> Seq.toArray
 
