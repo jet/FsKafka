@@ -20,6 +20,18 @@ module internal Prelude =
     if isNull s then ArraySegment()
     else Encoding.UTF8.GetBytes s |> arrayToSegment
 
+  module Map =
+
+    let mergeChoice (f:'a -> Choice<'b * 'c, 'b, 'c> -> 'd) (a:Map<'a, 'b>) (b:Map<'a, 'c>) : Map<'a, 'd> =
+      Set.union (a |> Seq.map (fun k -> k.Key) |> set) (b |> Seq.map (fun k -> k.Key) |> set)
+      |> Seq.map (fun k ->
+        match Map.tryFind k a, Map.tryFind k b with
+        | Some b, Some c -> k, f k (Choice1Of3 (b,c))
+        | Some b, None   -> k, f k (Choice2Of3 b)
+        | None,   Some c -> k, f k (Choice3Of3 c)
+        | None,   None   -> failwith "invalid state")
+      |> Map.ofSeq
+
   type Async with
     static member AwaitTaskCancellationAsError (t:Task<'a>) : Async<'a> =
         Async.FromContinuations <| fun (ok,err,_) ->
@@ -578,6 +590,7 @@ module Legacy =
 
     /// Returns consumer progress information.
     /// Passing empty set of partitions returns information for all partitions.
+    /// Note that this does not join the group as a consumer instance
     let progress (consumer:Consumer) (topic:string) (ps:int[]) = async {    
       let! topicPartitions = 
         if ps |> Array.isEmpty then
@@ -596,6 +609,8 @@ module Legacy =
       let committedOffsets =
         consumer.Committed(topicPartitions, TimeSpan.FromSeconds(20.))
         |> Seq.sortBy(fun e -> e.Partition)
+        |> Seq.map(fun e -> e.Partition, e)
+        |> Map.ofSeq
       
       let! watermarkOffsets =
         topicPartitions
@@ -604,26 +619,32 @@ module Legacy =
           )
           |> Async.Parallel
 
-      let partitions =
+      let watermarkOffsets =
         watermarkOffsets
-        |> Seq.sortBy fst
-        |> Seq.zip committedOffsets
-        |> Seq.map(fun (tpo,(p,wm)) ->
-          let o,l,e = tpo.Offset.Value,wm.High.Value,wm.Low.Value
-          let lag, lead =
-            match o with
-            | -1L -> l - e, 0L
-            | _ -> l - o, o - e
-          {
-            partition = p
-            consumerOffset = tpo.Offset
-            earliestOffset = wm.Low
-            highWatermarkOffset = wm.High
-            lag = lag
-            lead = lead
-            messageCount = l - e }
-        )        
+        |> Map.ofArray
+
+      let partitions =
+        (watermarkOffsets, committedOffsets)
+        ||> Map.mergeChoice (fun p -> function
+          | Choice1Of3 (hwo,cOffset) ->
+            let e,l,o = hwo.Low.Value,hwo.High.Value,cOffset.Offset.Value
+            // Consumer offset of -1 indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
+            let lag, lead =
+              match o with
+              | -1L -> l - e, 0L
+              | _ -> l - o, o - e
+            { partition = p ; consumerOffset = cOffset.Offset ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = lag ; lead = lead ; messageCount = l - e }
+          | Choice2Of3 hwo ->
+            // in the event there is no consumer offset present, lag should be calculated as high watermark minus earliest
+            // this prevents artifically high lags for partitions with no consumer offsets
+            let e,l = hwo.Low.Value,hwo.High.Value
+            let o = -1L
+            { partition = p ; consumerOffset = Offset(o) ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
+            //failwithf "unable to find consumer offset for topic=%s partition=%i" topic p
+          | Choice3Of3 o -> failwithf "unable to find topic offset for topic=%s partition=%i [consumer_offset=%i]" topic p o.Offset.Value)
+        |> Seq.map (fun kvp -> kvp.Value)
         |> Seq.toArray
+
       return 
         {
         topic = topic ; group = consumer.Name ; partitions = partitions ;
