@@ -378,7 +378,10 @@ module Consumer =
     while true do
       if c.Consume(&m, timeoutMs) then
         Message.throwIfError m
-        yield m }
+        yield m
+        let position = new TopicPartitionOffset(m.TopicPartition, new Offset(m.Offset.Value + 1L))
+        c.StoreOffsets([|position|]) |> ignore
+  }
 
   /// Represents repeated calls to Consumer.Consume with the specified timeout as an AsyncSeq.
   /// Buffers messages into buffers bounded by time and count.
