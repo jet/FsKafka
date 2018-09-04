@@ -10,20 +10,28 @@ open FSharp.Control
 open System.Collections.Concurrent
 open Confluent.Kafka.Config.DebugFlags
 
+let log (msg: string) = 
+  let msg = sprintf "%s %s" (DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss.ffff")) msg
+  //Debug.WriteLine msg
+  //Console.WriteLine(msg)
+  NUnit.Framework.TestContext.Out.WriteLine(msg)
+
 /// Produce 10K messages and group by partition
 /// Consume messages and make sure that they are consumed in-order and all messages were consumed
 [<Test>]
 [<Category("Confluent Client")>] 
 let ``Message ordering is preserved``() = 
 
-    let host =
+    let host = 
         match Environment.GetEnvironmentVariable "CONFLUENT_KAFKA_TEST_BROKER" with
         | x when String.IsNullOrWhiteSpace x -> "localhost"
         | brokers -> brokers
-    let topic = "test-topic-partitions"
+    let topic = "test-topic-partitions" + Guid.NewGuid().ToString()
     let messageCount = 10*1000 
     let reportInterval = TimeSpan.FromSeconds 5.0
     let groupId = "test-group"
+    let timeout = TimeSpan.FromSeconds(60.0)
+    log <| sprintf "Host: %s" host
 
     //
     // Producer
@@ -38,7 +46,7 @@ let ``Message ordering is preserved``() =
       |> Producer.create
       |> Producer.onLog (fun logger -> 
         let msg = sprintf "producer: %s" logger.Message
-        Debug.WriteLine msg
+        log msg
       )
 
     let mutable sent = 0
@@ -89,7 +97,7 @@ let ``Message ordering is preserved``() =
       |> Consumer.create
       |> Consumer.onLog(fun logger -> 
         let msg = sprintf "level: %d [%s] [%s]: %s" logger.Level logger.Facility logger.Name logger.Message
-        Debug.WriteLine msg
+        log msg
       )
 
     consumer.OnError
@@ -100,7 +108,7 @@ let ``Message ordering is preserved``() =
 
     let mutable assignment = None
 
-    let cancel = new CancellationTokenSource(TimeSpan.FromSeconds(40.0))
+    let cancel = new CancellationTokenSource(timeout)
     let batchSize = 100
     let mutable count = 0
     // partition -> last seen message value
@@ -189,21 +197,24 @@ let ``Offsets do not advance until a message is handled`` () =
         | brokers -> brokers
     let topic = "test-topic-conf-ofsts-dont-advn"
     let groupId = "test-group-conf-ofsts-dont-advn"
+    log <| sprintf "Host %s" host
 
     use producer =
       Config.Producer.safe
       |> Config.bootstrapServers host
       |> Config.clientId "test-client"
+      |> Config.debug [Config.DebugFlags.Msg]
       |> Producer.create
+      |> Producer.onLog(fun e -> log e.Message) 
 
     let publishOne key'value =
       let producedMsg =
         Confluent.Kafka.Producer.produceString producer topic key'value
         |> Async.RunSynchronously
       Assert.False (producedMsg.Error.HasError, "Failed to publish to topic" + producedMsg.Error.ToString())
-      Console.WriteLine ("Published message at partition: {0}, offset: {1}", producedMsg.Partition,  producedMsg.Offset)
+      log <| sprintf "Published message at partition: %d, offset: %O" producedMsg.Partition  producedMsg.Offset
 
-    let consumeDuration = TimeSpan.FromSeconds(10.)
+    let consumeDuration = TimeSpan.FromSeconds(30.)
     let commitInterval = consumeDuration.TotalMilliseconds / 4.
 
     use consumer =
@@ -214,7 +225,12 @@ let ``Offsets do not advance until a message is handled`` () =
       |> Config.Consumer.Topic.autoOffsetReset Config.Consumer.Topic.End
       |> Config.Consumer.commitIntervalMs (int commitInterval)
       |> Config.Consumer.enableAutoCommit true
+      |> Config.debug [Config.DebugFlags.Consumer; Config.DebugFlags.Cgrp]
       |> Consumer.create
+      |> Consumer.onLog(fun msg ->
+        log <| sprintf "consumer| %s" msg.Message
+      )
+    
 
     // Create topic if not exists
     do publishOne ("key", "init")
@@ -254,8 +270,6 @@ let ``Offsets do not advance until a message is handled`` () =
     // And another that we don't
     do publishOne ("key", "don't read me")
 
-    do consumer.Subscribe topic
-
     let commitCounter = ref 0
     let offsetDelta = ref 0L
 
@@ -269,16 +283,23 @@ let ``Offsets do not advance until a message is handled`` () =
       |> Seq.iter (fun tpoe ->
         let initOffset = Map.find (tpoe.Topic, tpoe.Partition) initialHighWatermark
         if tpoe.Offset.IsSpecial then
-          Console.WriteLine ("Skipping comparison for special offset, partition {0}", tpoe.Partition)
+          log <| sprintf "Skipping comparison for special offset, partition %d" tpoe.Partition
         else
           let newDelta = Interlocked.Add(offsetDelta, (tpoe.Offset.Value - initOffset.Value))
           Assert.AreEqual (1L, newDelta, "Committed offsets should not advance by more than 1!"))
       )
 
+    consumer.OnPartitionsAssigned
+    |> Event.add(fun p ->
+      log <| sprintf "OnPartitionsAssigned: %A" p
+      consumer.Assign p
+    )    
+
     let cancel = new CancellationTokenSource(consumeDuration)
 
     let mutable consumeCount = 0
-    let consumeProcess = Consumer.consume consumer 100 100 1 (fun _ -> async {
+    let consumeProcess = Consumer.consume consumer 100 100 1 (fun m -> async {
+      log <| sprintf "Got message %O" m
       if consumeCount = 0 then
         consumeCount <- consumeCount + 1
       else
@@ -287,6 +308,9 @@ let ``Offsets do not advance until a message is handled`` () =
         do! Async.Sleep (int sleepDuration.TotalMilliseconds)
         failwith "Did not sleep long enough"
       return () })
+    log "Subscribing consumer..."
+    do consumer.Subscribe topic
+    log "Subscribed consumer"
 
     try
       do Async.RunSynchronously (consumeProcess, cancellationToken = cancel.Token)
