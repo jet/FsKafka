@@ -12,9 +12,9 @@ open Confluent.Kafka.Config.DebugFlags
 
 let log (msg: string) = 
   let msg = sprintf "%s %s" (DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss.ffff")) msg
-  //Debug.WriteLine msg
+  Debug.WriteLine msg
   //Console.WriteLine(msg)
-  NUnit.Framework.TestContext.Out.WriteLine(msg)
+  //NUnit.Framework.TestContext.Out.WriteLine(msg)
 
 /// Produce 10K messages and group by partition
 /// Consume messages and make sure that they are consumed in-order and all messages were consumed
@@ -22,7 +22,7 @@ let log (msg: string) =
 [<Category("Confluent Client")>] 
 let ``Message ordering is preserved``() = 
 
-    let host = 
+    let host =
         match Environment.GetEnvironmentVariable "CONFLUENT_KAFKA_TEST_BROKER" with
         | x when String.IsNullOrWhiteSpace x -> "localhost"
         | brokers -> brokers
@@ -132,6 +132,10 @@ let ``Message ordering is preserved``() =
     let consumerProcess = 
       Consumer.consume consumer 1000 1000 batchSize (fun batch -> async {
         let firstMsg = batch.messages |> Array.head
+        let lastMsg = batch.messages |> Array.last
+        log <| sprintf "Received batch. p: %d offsets:[%d:%d]. Batch[%d]" batch.partition firstMsg.Offset.Value lastMsg.Offset.Value batch.messages.Length
+        if lastMsg.Offset.Value - firstMsg.Offset.Value + 1L <> (int64 batch.messages.Length) then
+          log <| sprintf "wrong count of messages %s" (batch.messages |> Seq.map(fun m -> string m.Offset.Value) |> String.concat ",")
         firstOffsets.AddOrUpdate(batch.partition, firstMsg.Offset.Value, (fun _ o -> o)) |> ignore
 
         batch.messages
@@ -191,10 +195,11 @@ let ``Message ordering is preserved``() =
 [<Test>]
 [<Category("Wrapper")>]
 let ``Offsets do not advance until a message is handled`` () =
-    let host =
+    let host = 
         match Environment.GetEnvironmentVariable "CONFLUENT_KAFKA_TEST_BROKER" with
         | x when String.IsNullOrWhiteSpace x -> "localhost"
         | brokers -> brokers
+        
     let topic = "test-topic-conf-ofsts-dont-advn"
     let groupId = "test-group-conf-ofsts-dont-advn"
     log <| sprintf "Host %s" host

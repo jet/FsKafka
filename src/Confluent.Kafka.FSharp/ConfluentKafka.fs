@@ -342,7 +342,7 @@ module Consumer =
             Message.throwIfError m
             buf.Add m
             // drain in-memory buffer
-            while c.Consume(&m, 0) && (not localCancel.Token.IsCancellationRequested) do
+            while (buf.Count <= batchSize) && (not localCancel.Token.IsCancellationRequested) && c.Consume(&m, 0) do
               Message.throwIfError m
               buf.Add m
             buf
