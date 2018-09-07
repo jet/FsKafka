@@ -3,7 +3,7 @@ source https://api.nuget.org/v3/index.json
 
 nuget FSharp.Core >= 4.3.4 lowest_matching:true
 nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
-nuget Confluent.Kafka ~> 0.11.4 lowest_matching:true
+nuget Confluent.Kafka ~> 0.11.6-rc1 lowest_matching:true
 nuget SourceLink.Create.CommandLine copy_local: true
 
 group Legacy
@@ -12,7 +12,7 @@ group Legacy
 
   nuget FSharp.Core >= 3.1 lowest_matching: true
   nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
-  nuget Confluent.Kafka ~> 0.11.4 lowest_matching:true
+  nuget Confluent.Kafka ~> 0.11.6-rc1 lowest_matching:true
   nuget SourceLink.Create.CommandLine copy_local: true
 
 group Build
@@ -31,5 +31,5 @@ group Test
   nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
   nuget NUnit ~> 3.0
   nuget NUnit3TestAdapter ~> 3.0
-  nuget Confluent.Kafka ~> 0.11.4 lowest_matching:true
+  nuget Confluent.Kafka ~> 0.11.6-rc1 lowest_matching:true
   nuget Microsoft.NET.Test.Sdk
