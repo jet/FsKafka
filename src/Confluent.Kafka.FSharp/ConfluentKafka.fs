@@ -629,7 +629,7 @@ module Legacy =
         ||> Map.mergeChoice (fun p -> function
           | Choice1Of3 (hwo,cOffset) ->
             let e,l,o = hwo.Low.Value,hwo.High.Value,cOffset.Offset.Value
-            // Consumer offset of -1 indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
+            // Consumer offset of (Invalid Offset -1001) indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
             let lag, lead =
               match o with
               | offset when offset = Offset.Invalid.Value -> l - e, 0L
