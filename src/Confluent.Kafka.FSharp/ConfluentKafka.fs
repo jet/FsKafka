@@ -589,7 +589,6 @@ module Legacy =
 
   /// Operations for providing consumer progress information.
   module ConsumerInfo =
-    let RD_KAFKA_OFFSET_INVALID = -1001L
     /// Returns consumer progress information.
     /// Passing empty set of partitions returns information for all partitions.
     /// Note that this does not join the group as a consumer instance
@@ -633,14 +632,14 @@ module Legacy =
             // Consumer offset of -1 indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
             let lag, lead =
               match o with
-              | offset when offset = RD_KAFKA_OFFSET_INVALID -> l - e, 0L
+              | offset when offset = Offset.Invalid.Value -> l - e, 0L
               | _ -> l - o, o - e
             { partition = p ; consumerOffset = cOffset.Offset ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = lag ; lead = lead ; messageCount = l - e }
           | Choice2Of3 hwo ->
             // in the event there is no consumer offset present, lag should be calculated as high watermark minus earliest
             // this prevents artifically high lags for partitions with no consumer offsets
             let e,l = hwo.Low.Value,hwo.High.Value
-            { partition = p ; consumerOffset = Offset(RD_KAFKA_OFFSET_INVALID) ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
+            { partition = p ; consumerOffset = Offset.Invalid ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
             //failwithf "unable to find consumer offset for topic=%s partition=%i" topic p
           | Choice3Of3 o ->
             let invalid = Offset.Invalid
@@ -655,4 +654,4 @@ module Legacy =
         minLead =
           if partitions.Length > 0 then
             partitions |> Seq.map (fun p -> p.lead) |> Seq.min
-          else RD_KAFKA_OFFSET_INVALID }}
+          else Offset.Invalid.Value }}
