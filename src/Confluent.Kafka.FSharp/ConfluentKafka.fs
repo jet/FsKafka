@@ -587,17 +587,15 @@ module Legacy =
 
   }
 
-
   /// Operations for providing consumer progress information.
   module ConsumerInfo =
-
     /// Returns consumer progress information.
     /// Passing empty set of partitions returns information for all partitions.
     /// Note that this does not join the group as a consumer instance
-    let progress (consumer:Consumer) (topic:string) (ps:int[]) = async {    
-      let! topicPartitions = 
+    let progress (consumer:Consumer) (topic:string) (ps:int[]) = async {
+      let! topicPartitions =
         if ps |> Array.isEmpty then
-          async {            
+          async {
             let meta =
               consumer.GetMetadata(false, TimeSpan.FromSeconds(40.0)).Topics
               |> Seq.find(fun t -> t.Topic = topic)
@@ -606,15 +604,15 @@ module Legacy =
               meta.Partitions
               |> Seq.map(fun p -> new TopicPartition(topic, p.PartitionId))
                }
-        else 
+        else
           async { return ps |> Seq.map(fun p -> new TopicPartition(topic,p)) }
-                    
+
       let committedOffsets =
         consumer.Committed(topicPartitions, TimeSpan.FromSeconds(20.))
         |> Seq.sortBy(fun e -> e.Partition)
         |> Seq.map(fun e -> e.Partition, e)
         |> Map.ofSeq
-      
+
       let! watermarkOffsets =
         topicPartitions
           |> Seq.map(fun tp -> async {
@@ -631,30 +629,29 @@ module Legacy =
         ||> Map.mergeChoice (fun p -> function
           | Choice1Of3 (hwo,cOffset) ->
             let e,l,o = hwo.Low.Value,hwo.High.Value,cOffset.Offset.Value
-            // Consumer offset of -1 indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
+            // Consumer offset of (Invalid Offset -1001) indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
             let lag, lead =
               match o with
-              | -1L -> l - e, 0L
+              | offset when offset = Offset.Invalid.Value -> l - e, 0L
               | _ -> l - o, o - e
             { partition = p ; consumerOffset = cOffset.Offset ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = lag ; lead = lead ; messageCount = l - e }
           | Choice2Of3 hwo ->
             // in the event there is no consumer offset present, lag should be calculated as high watermark minus earliest
             // this prevents artifically high lags for partitions with no consumer offsets
             let e,l = hwo.Low.Value,hwo.High.Value
-            let o = -1L
-            { partition = p ; consumerOffset = Offset(o) ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
+            { partition = p ; consumerOffset = Offset.Invalid ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
             //failwithf "unable to find consumer offset for topic=%s partition=%i" topic p
-          | Choice3Of3 o -> 
+          | Choice3Of3 o ->
             let invalid = Offset.Invalid
             { partition = p ; consumerOffset = o.Offset ; earliestOffset = invalid ; highWatermarkOffset = invalid ; lag = invalid.Value ; lead = invalid.Value ; messageCount = -1L })
         |> Seq.map (fun kvp -> kvp.Value)
         |> Seq.toArray
 
-      return 
+      return
         {
         topic = topic ; group = consumer.Name ; partitions = partitions ;
         totalLag = partitions |> Seq.sumBy (fun p -> p.lag)
         minLead =
-          if partitions.Length > 0 then 
+          if partitions.Length > 0 then
             partitions |> Seq.map (fun p -> p.lead) |> Seq.min
-          else -1L }}
+          else Offset.Invalid.Value }}
