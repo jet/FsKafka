@@ -1,0 +1,14 @@
+<Project ToolsVersion="15.0">
+  <PropertyGroup>
+    <VersionPrefix>0.9.0</VersionPrefix>
+    <Authors>@jet @eulerfx @eirik</Authors>
+    <Company>Jet.com</Company>
+    <Description>Lightweight F# wrapper for Confluent.Kafka</Description>
+    <PackageProjectUrl>https://github.com/jet/confluent-kafka-fsharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jet/confluent-kafka-fsharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>kafka fsharp</PackageTags>
+    <PackageLicenseUrl>https://github.com/jet/confluent-kafka-fsharp/blob/master/LICENSE.txt</PackageLicenseUrl>
+    <Copyright>Copyright © 2018</Copyright>
+  </PropertyGroup>
+</Project>
