@@ -9,9 +9,9 @@
 
   <PropertyGroup>
     <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+    <PackageId>Jet.ConfluentKafka.fsharp</PackageId>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
     <None Include="paket.references" />
     <Compile Include="ConfluentKafka.fs" />
     <None Include="Script.fsx" />
