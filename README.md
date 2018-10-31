@@ -1,19 +1,13 @@
+[![NuGet](https://img.shields.io/nuget/v/Nuget.Core.svg)](https://www.nuget.org/packages/Jet.ConfluentKafka.fsharp/)
+
 # Confluent.Kafka.FSharp
 
-F# friendly wrapper for Confluent.Kafka, designed for compatibility with the Kafunk API.
+F# friendly wrapper for Confluent.Kafka, designed for compatibility with the [Kafunk](https://github.com/jet/kafunk) API.
 
-## Using the wrapper
-
-To incorporate the wrapper in your project place the following line in your paket.dependencies file:
-```
-github jet/confluent-kafka-fsharp:<commit hash> src/Confluent.Kafka.FSharp/ConfluentKafka.fs
-nuget Confluent.Kafka
+## Installation
 
 ```
-and in paket.references:
-```
-File: ConfluentKafka.fs
-Confluent.Kafka
+PS> Install-Package Jet.ConfluentKafka.fsharp
 ```
 
 ## Running Tests
