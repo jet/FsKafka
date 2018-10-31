@@ -1,4 +1,4 @@
-[![NuGet](https://img.shields.io/nuget/v/Nuget.Core.svg)](https://www.nuget.org/packages/Jet.ConfluentKafka.fsharp/)
+[![NuGet](https://img.shields.io/nuget/v/Jet.ConfluentKafka.fsharp.svg)](https://www.nuget.org/packages/Jet.ConfluentKafka.fsharp/)
 
 # Confluent.Kafka.FSharp
 
