@@ -1,13 +1,20 @@
 version 5.184.0
 
 source https://api.nuget.org/v3/index.json
-framework: netstandard2.0
+framework: netstandard2.0, netcoreapp2.0
 
 nuget FSharp.Core >= 4.3.4 lowest_matching:true
 nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
 nuget Confluent.Kafka = 0.11.3
 nuget librdkafka.redist = 0.11.4
+
+# sourcelink
 nuget SourceLink.Create.CommandLine copy_local: true
+
+# tests
+nuget NUnit ~> 3.10.1
+nuget NUnit3TestAdapter ~> 3.10.0
+nuget Microsoft.NET.Test.Sdk ~> 15.9.0
 
 group Legacy
   source https://api.nuget.org/v3/index.json
@@ -17,17 +24,17 @@ group Legacy
   nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
   nuget Confluent.Kafka = 0.11.3
   nuget librdkafka.redist = 0.11.4
+
+  # sourcelink
   nuget SourceLink.Create.CommandLine copy_local: true
 
-group Test
-  source https://api.nuget.org/v3/index.json
-  framework: netcoreapp2.0, net45
-  redirects: force
+  # tests
+  nuget NUnit ~> 3.10.1
+  nuget NUnit3TestAdapter ~> 3.10.0
+  nuget Microsoft.NET.Test.Sdk ~> 15.9.0
 
-  nuget FSharp.Core >= 3.1 lowest_matching: true
-  nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
-  nuget NUnit ~> 3.0
-  nuget NUnit3TestAdapter ~> 3.0
-  nuget Confluent.Kafka = 0.11.3
-  nuget librdkafka.redist = 0.11.4
-  nuget Microsoft.NET.Test.Sdk
+group TestsLegacy
+  source https://api.nuget.org/v3/index.json
+  framework: net45
+
+  nuget FSharp.Core >= 4.3.4 lowest_matching:true
