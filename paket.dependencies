@@ -2,6 +2,7 @@ version 5.184.0
 
 source https://api.nuget.org/v3/index.json
 framework: netstandard2.0, netcoreapp2.0
+storage: none
 
 nuget FSharp.Core >= 4.3.4 lowest_matching:true
 nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
@@ -19,6 +20,7 @@ nuget Microsoft.NET.Test.Sdk ~> 15.9.0
 group Legacy
   source https://api.nuget.org/v3/index.json
   framework: net45
+  storage: none
 
   nuget FSharp.Core >= 3.1 lowest_matching: true
   nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
@@ -36,5 +38,6 @@ group Legacy
 group TestsLegacy
   source https://api.nuget.org/v3/index.json
   framework: net45
+  storage: none
 
   nuget FSharp.Core >= 4.3.4 lowest_matching:true
