@@ -1,3 +1,4 @@
+STORAGE: NONE
 RESTRICTION: || (== netcoreapp2.0) (== netstandard2.0)
 NUGET
   remote: https://api.nuget.org/v3/index.json
@@ -495,6 +496,7 @@ NUGET
       System.Xml.XPath (>= 4.3)
 
 GROUP Legacy
+STORAGE: NONE
 RESTRICTION: == net45
 NUGET
   remote: https://api.nuget.org/v3/index.json
@@ -509,9 +511,10 @@ NUGET
       Microsoft.CodeCoverage (>= 15.9)
     NUnit (3.10.1)
     NUnit3TestAdapter (3.10)
-    SourceLink.Create.CommandLine (2.8.1) - copy_local: true
+    SourceLink.Create.CommandLine (2.8.3) - copy_local: true
 
 GROUP TestsLegacy
+STORAGE: NONE
 RESTRICTION: == net45
 NUGET
   remote: https://api.nuget.org/v3/index.json
