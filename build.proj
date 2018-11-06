@@ -12,7 +12,12 @@
   </Target>
 
   <Target Name="Pack" DependsOnTargets="Build">
-    <Exec Command='$(MonoOrEmpty)paket.exe pack "$(NupkgsDir)" --template "$(RepoRootDir)/src/Confluent.Kafka.FSharp/paket.template" --version "$(VersionPrefix)-$(VersionSuffix)" ' WorkingDirectory=".paket" IgnoreStandardErrorWarningFormat="true" />
+    <PropertyGroup>
+      <NupkgVersion Condition=" '$(VersionSuffix)' == '' ">$(VersionPrefix)</NupkgVersion>
+      <NupkgVersion Condition=" '$(VersionSuffix)' != '' ">$(VersionPrefix)-$(VersionSuffix)</NupkgVersion>
+    </PropertyGroup>
+
+    <Exec Command='$(MonoOrEmpty)paket.exe pack "$(NupkgsDir)" --template "$(RepoRootDir)/src/Confluent.Kafka.FSharp/paket.template" --version $(NupkgVersion) ' WorkingDirectory=".paket" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
   <Target Name="Test">
