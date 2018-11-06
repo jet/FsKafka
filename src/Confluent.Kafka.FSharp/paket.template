@@ -1,6 +1,13 @@
 type project
 id Jet.ConfluentKafka.fsharp
+title Jet.ConfluentKafka.fsharp
 requireLicenseAcceptance false
+projectUrl https://github.com/jet/confluent-kafka-fsharp
+licenseUrl https://github.com/jet/confluent-kafka-fsharp/blob/master/LICENSE.txt
+authors @jet @eulerfx @eirik
+copyright Copyright © 2018
+tags
+    kafka, fsharp
 dependencies
   framework: net45
     FSharp.Core >= LOCKEDVERSION-Legacy
