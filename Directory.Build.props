@@ -11,4 +11,16 @@
     <PackageLicenseUrl>https://github.com/jet/confluent-kafka-fsharp/blob/master/LICENSE.txt</PackageLicenseUrl>
     <Copyright>Copyright © 2018</Copyright>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <RepoRootDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoRootDir>
+    <NupkgsDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)/bin/nupkg"))</NupkgsDir>
+    <MonoOrEmpty Condition=" '$(OS)' != 'Windows_NT' ">mono </MonoOrEmpty>
+
+    <!-- disable sourcelink on mono, to workaround https://github.com/dotnet/sourcelink/issues/155 -->
+    <EnableSourceLink Condition=" '$(OS)' != 'Windows_NT' AND '$(MSBuildRuntimeType)' != 'Core' ">false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>$(EnableSourceLink)</EnableSourceControlManagerQueries>
+
+    <NoWarn>$(NoWarn);FS2003</NoWarn>
+  </PropertyGroup>
 </Project>
