@@ -1,3 +1,5 @@
+version 5.184.0
+
 source https://api.nuget.org/v3/index.json
 
 nuget FSharp.Core >= 4.3.4 lowest_matching:true
