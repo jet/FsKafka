@@ -1,6 +1,7 @@
 version 5.184.0
 
 source https://api.nuget.org/v3/index.json
+framework: netstandard2.0
 
 nuget FSharp.Core >= 4.3.4 lowest_matching:true
 nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
@@ -13,6 +14,9 @@ group Legacy
   framework: net45
 
   nuget FSharp.Core >= 3.1 lowest_matching: true
+  nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
+  nuget Confluent.Kafka = 0.11.3
+  nuget librdkafka.redist = 0.11.4
   nuget SourceLink.Create.CommandLine copy_local: true
 
 group Test
