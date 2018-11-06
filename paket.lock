@@ -585,16 +585,6 @@ NUGET
       System.Threading (>= 4.3) - restriction: || (>= dnxcore50) (&& (< monoandroid) (< monotouch) (< net45) (>= netstandard1.3) (< win8) (< wpa81) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos))
       System.Xml.ReaderWriter (>= 4.3) - restriction: || (>= dnxcore50) (&& (< monoandroid) (< monotouch) (< net45) (>= netstandard1.3) (< win8) (< wpa81) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos)) (&& (< monoandroid) (< net45) (>= netstandard1.0) (< netstandard1.3) (< win8) (< wp8) (< wpa81))
 
-GROUP Build
-RESTRICTION: == net45
-NUGET
-  remote: https://api.nuget.org/v3/index.json
-    FAKE (4.64.13)
-    Octokit (0.29)
-GITHUB
-  remote: fsharp/FAKE
-    modules/Octokit/Octokit.fsx (7207fc85d52c6ee21f49c61551b8323b4e7608ed)
-      Octokit (>= 0.20)
 GROUP Legacy
 RESTRICTION: == net45
 NUGET
