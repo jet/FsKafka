@@ -1,4 +1,5 @@
 type project
+id Jet.ConfluentKafka.fsharp
 requireLicenseAcceptance false
 dependencies
   framework: net45
