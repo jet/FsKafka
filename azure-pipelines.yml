@@ -17,10 +17,6 @@ jobs:
     displayName: Create package
     env:
       VersionSuffix: '$(VersionSuffix)'
-  - script: dotnet test build.proj -v n
-    displayName: Run tests
-    env:
-      VersionSuffix: '$(VersionSuffix)'
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
@@ -38,8 +34,6 @@ jobs:
     displayName: Workaround .NET reference assemblies on linux
   - script: dotnet pack build.proj -v n
     displayName: Create package
-  - script: dotnet test build.proj -v n
-    displayName: Run tests
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
@@ -53,8 +47,6 @@ jobs:
     displayName: Workaround .NET reference assemblies on linux
   - script: dotnet pack build.proj -v n
     displayName: Create package
-  - script: dotnet test build.proj -v n
-    displayName: Run tests
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'
