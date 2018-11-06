@@ -21,8 +21,6 @@ dependencies
     librdkafka.redist == LOCKEDVERSION
 files
     bin/Release/net45/Confluent.Kafka.FSharp.dll ==> lib/net45
-    bin/Release/net45/Confluent.Kafka.FSharp.pdb ==> lib/net45
     bin/Release/net45/Confluent.Kafka.FSharp.xml ==> lib/net45
     bin/Release/netstandard2.0/Confluent.Kafka.FSharp.dll ==> lib/netstandard2.0
-    bin/Release/netstandard2.0/Confluent.Kafka.FSharp.pdb ==> lib/netstandard2.0
     bin/Release/netstandard2.0/Confluent.Kafka.FSharp.xml ==> lib/netstandard2.0

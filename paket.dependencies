@@ -9,9 +9,6 @@ nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
 nuget Confluent.Kafka = 0.11.3
 nuget librdkafka.redist = 0.11.4
 
-# sourcelink
-nuget SourceLink.Create.CommandLine copy_local: true
-
 # tests
 nuget NUnit ~> 3.10.1
 nuget NUnit3TestAdapter ~> 3.10.0
@@ -26,9 +23,6 @@ group Legacy
   nuget FSharp.Control.AsyncSeq >= 2.0.21 lowest_matching: true
   nuget Confluent.Kafka = 0.11.3
   nuget librdkafka.redist = 0.11.4
-
-  # sourcelink
-  nuget SourceLink.Create.CommandLine copy_local: true
 
   # tests
   nuget NUnit ~> 3.10.1

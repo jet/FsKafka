@@ -89,7 +89,6 @@ NUGET
     runtime.native.System (4.3.1) - restriction: || (== netcoreapp2.0) (&& (== netstandard2.0) (>= netcoreapp1.0))
       Microsoft.NETCore.Platforms (>= 1.1.1)
       Microsoft.NETCore.Targets (>= 1.1.3)
-    SourceLink.Create.CommandLine (2.8.3) - copy_local: true
     System.AppContext (4.3) - restriction: || (== netcoreapp2.0) (&& (== netstandard2.0) (>= netcoreapp1.0))
       System.Runtime (>= 4.3)
     System.Collections (4.3)
@@ -511,7 +510,6 @@ NUGET
       Microsoft.CodeCoverage (>= 15.9)
     NUnit (3.10.1)
     NUnit3TestAdapter (3.10)
-    SourceLink.Create.CommandLine (2.8.3) - copy_local: true
 
 GROUP TestsLegacy
 STORAGE: NONE
