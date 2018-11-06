@@ -30,15 +30,6 @@ jobs:
     inputs:
       pathtoPublish: 'bin/nupkg'
       artifactName: 'nupkgs'
-  - task: NuGetCommand@2
-    condition: and(succeeded(), or(eq(variables['Build.Reason'], 'PullRequest'), eq(variables['Build.SourceBranch'], 'refs/heads/master')))
-    inputs:
-      command: push
-      nuGetFeedType: external
-      publishFeedCredentials: 'Jet-MyGet'
-      versioningScheme: byEnvVar
-      versionEnvVar: Version
-      packagesToPush: 'bin/nupkg/*.nupkg;bin/nupkg/*.symbols.nupkg'
 - job: Linux
   pool:
     vmImage: 'ubuntu-16.04'
