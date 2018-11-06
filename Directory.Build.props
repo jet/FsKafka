@@ -7,7 +7,7 @@
     <PackageProjectUrl>https://github.com/jet/confluent-kafka-fsharp</PackageProjectUrl>
     <RepositoryUrl>https://github.com/jet/confluent-kafka-fsharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>kafka fsharp</PackageTags>
+    <PackageTags>kafka;fsharp</PackageTags>
     <PackageLicenseUrl>https://github.com/jet/confluent-kafka-fsharp/blob/master/LICENSE.txt</PackageLicenseUrl>
     <Copyright>Copyright © 2018</Copyright>
   </PropertyGroup>
