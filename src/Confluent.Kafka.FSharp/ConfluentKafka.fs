@@ -225,11 +225,15 @@ module Producer =
     return m }
 
   let private produceBatchedInternal (p:Producer) (topic:string) (throwOnError:bool) (ms:(ArraySegment<byte> * ArraySegment<byte>)[]) : Async<Message[]> = async {
-    let handler,result = batchDeliveryHandler ms.Length throwOnError
-    for i = 0 to ms.Length - 1 do
-      let k,v = ms.[i]
-      p.ProduceAsync(topic, k.Array, k.Offset, k.Count, v.Array, v.Offset, v.Count, true, handler)
-    return! result |> Async.AwaitTask }
+    if ms.Length <> 0 then
+      let handler,result = batchDeliveryHandler ms.Length throwOnError
+      for i = 0 to ms.Length - 1 do
+        let k,v = ms.[i]
+        p.ProduceAsync(topic, k.Array, k.Offset, k.Count, v.Array, v.Offset, v.Count, true, handler)
+      return! result |> Async.AwaitTask 
+    else
+      return Array.empty    
+  }
 
   let produce (p:Producer) (topic:string) (k:ArraySegment<byte>, v:ArraySegment<byte>) : Async<Message> =
     produceInternal p topic true (k,v)
