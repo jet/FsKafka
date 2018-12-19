@@ -43,6 +43,20 @@ jobs:
     displayName: Workaround .NET reference assemblies on linux
   - script: dotnet pack build.proj -v n
     displayName: Create package
+  
+  - script: |
+      docker network create kafka-net
+      docker run -d --name zookeeper --network kafka-net --publish 2181:2181 zookeeper:3.4
+      docker run -d --name kafka --network kafka-net --hostname localhost --publish 9092:9092 \
+          --env KAFKA_ADVERTISED_HOST_NAME=127.0.0.1 --env ZOOKEEPER_IP=zookeeper \
+          --env KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
+          ches/kafka
+      sleep 15
+    displayName: Docker kafka for integration tests
+
+  - script: dotnet test tests/Confluent.Kafka.FSharp.Tests -v n -f netcoreapp2.0 -c Release --logger:trx
+    displayName: "Integration test"
+
   - task: PublishTestResults@2
     inputs:
       testResultsFormat: 'VSTest'

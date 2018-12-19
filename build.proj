@@ -21,7 +21,7 @@
   </Target>
 
   <Target Name="Test">
-    <Exec Command='dotnet test tests/Confluent.Kafka.FSharp.Tests -c Release --logger:trx' WorkingDirectory="$(RepoRootDir)" IgnoreStandardErrorWarningFormat="true" />
+    <Exec Command='dotnet test tests/Confluent.Kafka.FSharp.Tests -f netcoreapp2.0 -c Release --logger:trx' WorkingDirectory="$(RepoRootDir)" IgnoreStandardErrorWarningFormat="true" />
   </Target>
 
   <Target Name="VSTest" DependsOnTargets="Test" />
