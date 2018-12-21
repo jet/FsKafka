@@ -1,6 +1,6 @@
 <Project ToolsVersion="15.0">
   <PropertyGroup>
-    <VersionPrefix>0.9.2</VersionPrefix>
+    <VersionPrefix>0.9.3</VersionPrefix>
     <Authors>@jet @eulerfx @eirik</Authors>
     <Company>Jet.com</Company>
     <Description>Lightweight F# wrapper for Confluent.Kafka</Description>
