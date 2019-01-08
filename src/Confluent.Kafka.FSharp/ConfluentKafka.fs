@@ -423,9 +423,11 @@ module Consumer =
     let partitions =
       if partitions |> Seq.isEmpty then
         (
-          consumer.GetMetadata(true, TimeSpan.FromSeconds(20.0)).Topics
-          |> Seq.filter(fun t -> t.Topic = topic)
-          |> Seq.head
+          let topicSeq = 
+            consumer.GetMetadata(true, TimeSpan.FromSeconds(20.0)).Topics            
+            |> Seq.filter(fun t -> t.Topic = topic)
+          if topicSeq |> Seq.isEmpty then failwithf "Metadata fetch error | Topic:%O does not exist" topic
+          else topicSeq |> Seq.head
         ).Partitions
         |> Seq.map(fun p -> p.PartitionId)
       else
