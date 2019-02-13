@@ -38,8 +38,8 @@ Consumer:
 https://github.com/jet/confluent-kafka-fsharp/blob/911e4775211044a43c7df3122a7fca1b536313e9/tests/Confluent.Kafka.FSharp.Tests/Tests.fs#L82
 
 ### Logging
-Set what to debug: https://github.com/jet/confluent-kafka-fsharp/blob/35ee285ac8e2ee584a5545dbb9c634f0b9e44692/tests/Confluent.Kafka.FSharp.Tests/Tests.fs#L45
-Configure logger: https://github.com/jet/confluent-kafka-fsharp/blob/35ee285ac8e2ee584a5545dbb9c634f0b9e44692/tests/Confluent.Kafka.FSharp.Tests/Tests.fs#L47-L50
+Set [what to debug] (https://github.com/jet/confluent-kafka-fsharp/blob/35ee285ac8e2ee584a5545dbb9c634f0b9e44692/tests/Confluent.Kafka.FSharp.Tests/Tests.fs#L45)
+[Configure logger] (https://github.com/jet/confluent-kafka-fsharp/blob/35ee285ac8e2ee584a5545dbb9c634f0b9e44692/tests/Confluent.Kafka.FSharp.Tests/Tests.fs#L47-L50)
 
 ### Metadata
 Use `GetMetadata` call: https://github.com/confluentinc/confluent-kafka-dotnet/blob/57192f3122569de257841b4057ea79ad4107ce10/src/Confluent.Kafka/Consumer.cs#L688
