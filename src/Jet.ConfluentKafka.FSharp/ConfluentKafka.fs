@@ -104,7 +104,7 @@ type KafkaProducer private (log: ILogger, producer : Producer<string, string>, t
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string) =
         if String.IsNullOrEmpty topic then nullArg "topic"
-        log.Information("Producing... {broker} / {topic} compression={compression} acks={acks}", config.Broker, topic, config.Compression, config.Acks)
+        log.Information("Producing... {broker} / {topic} compression={compression:l} acks={acks}", config.Broker, topic, config.Compression, config.Acks)
         let producer =
             ProducerBuilder<string, string>(config.Kvps)
                 .SetLogHandler(fun _p m -> log.Information("{message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))

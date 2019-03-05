@@ -42,9 +42,9 @@ Please note the [QuickStart](quickstart) is probably the best way to gain an ove
 
 NB The tests are reliant on a `TEST_KAFKA_BROKER` environment variable pointing to a test environment that will auto-create ephemeral Kafka Topics as required by the tests (each test run writes to a guid-named topic)
 
-### build, including tests
+### build, including tests on net461 and netcoreapp2.1
 
-    dotnet build build.proj
+    dotnet build build.proj -v n
 
 ## FAQ
 
