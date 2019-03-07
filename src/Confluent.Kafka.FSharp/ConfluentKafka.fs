@@ -393,6 +393,16 @@ module Consumer =
     let mutable m = Unchecked.defaultof<_>
     let mutable last = DateTime.UtcNow
     let buf = ResizeArray<_>()
+
+    let storeOffsets (buffer:ResizeArray<Message>) = 
+      let positions = 
+        buffer
+        |> Seq.groupBy(fun e -> (e.Partition,e.Topic))
+        |> Seq.map(fun (_,seq) -> 
+            let msg = seq |> Seq.maxBy(fun s -> s.Offset.Value)
+            new TopicPartitionOffset(msg.TopicPartition, new Offset(msg.Offset.Value + 1L)))
+      c.StoreOffsets(positions) |> ignore
+      
     while true do
       let now = DateTime.UtcNow
       let dt = int (now - last).TotalMilliseconds
@@ -403,11 +413,13 @@ module Consumer =
         buf.Add m
         if buf.Count >= batchSize then
           yield buf.ToArray()
+          do storeOffsets buf
           buf.Clear ()
       else
         last <- now
         if buf.Count > 0 then
           yield buf.ToArray()
+          do storeOffsets buf
           buf.Clear () }
 
   /// Query low and high watermaks from broker
