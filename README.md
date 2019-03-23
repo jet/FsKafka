@@ -2,7 +2,7 @@
 
 F# friendly wrapper for `Confluent.Kafka` versions `>= 1.0.0`, with minimal dependencies or additional abstractions.
 
-See also: [`v0` branch](https://github.com/jet/Jet.ConfluentKafka.FSharp/tree/v0), which targets `Confluent.Kafka` versions `0.9.*` and is designed for compatibility with the [Kafunk](https://github.com/jet/kafunk) API.
+**See also: [`v0` branch](https://github.com/jet/Jet.ConfluentKafka.FSharp/tree/v0), which targets `Confluent.Kafka` versions `0.9.*` and is designed for compatibility with the [Kafunk](https://github.com/jet/kafunk) API.**
 
 ## QuickStart
 
@@ -35,11 +35,11 @@ Within those constraints, contributions of all kinds are welcome:
 
 ## TEMPLATES
 
-The best place to start, sample-wise is with the [QuickStart](quickstart), which walks you through sample code, tuned for approachability, from `dotnet new` templates stored [in a dedicated repo](https://github.com/jet/dotnet-templates).
+The best place to start, sample-wise is with the [QuickStart](#quickstart), which walks you through sample code, tuned for approachability, from `dotnet new` templates stored [in a dedicated repo](https://github.com/jet/dotnet-templates).
 
 ## BUILDING
 
-Please note the [QuickStart](quickstart) is probably the best way to gain an overview, and the templates are the best way to see how to consume it; these instructions are intended mainly for people looking to make changes. 
+Please note the [QuickStart](#quickstart) is probably the best way to gain an overview, and the templates are the best way to see how to consume it; these instructions are intended mainly for people looking to make changes. 
 
 NB The tests are reliant on a `TEST_KAFKA_BROKER` environment variable pointing to a Broker that has been configured to auto-create ephemeral Kafka Topics as required by the tests (each test run writes to a guid-named topic)
 
