@@ -70,7 +70,7 @@ type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression : Compre
         statisticsInterval |> Option.iter (fun (i : TimeSpan) -> c.StatisticsIntervalMs <- Nullable (int i.TotalMilliseconds))
         KafkaProducerConfig(c, cfgs, broker, compression, acks)
 
-type KafkaProducer private (log: ILogger, producer : Producer<string, string>, topic : string) =
+type KafkaProducer private (log: ILogger, producer : IProducer<string, string>, topic : string) =
     member __.Topic = topic
 
     interface IDisposable with member __.Dispose() = for d in [(*d1;d2;*)producer:>IDisposable] do d.Dispose()
@@ -177,7 +177,7 @@ type KafkaProducer private (log: ILogger, producer : Producer<string, string>, t
                 while inFlightBytes > minInFlightBytes do Thread.Sleep 5
                 log.Information "Consumer resuming polling"
 
-    let mkBatchedMessageConsumer (log: ILogger) (buf : ConsumerBufferingConfig) (ct : CancellationToken) (consumer : Consumer<string, string>)
+    let mkBatchedMessageConsumer (log: ILogger) (buf : ConsumerBufferingConfig) (ct : CancellationToken) (consumer : IConsumer<string, string>)
             (partitionedCollection: PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>)
             (handler : ConsumeResult<string,string>[] -> Async<unit>) = async {
         let tcs = new TaskCompletionSource<unit>()
@@ -211,7 +211,7 @@ type KafkaProducer private (log: ILogger, producer : Producer<string, string>, t
                                 let maxOffset = batch |> Array.maxBy (fun m -> let o = m.Offset in o.Value)
                                 let raw = maxOffset.TopicPartitionOffset
                                 TopicPartitionOffset(raw.Topic, raw.Partition, Offset(let o = raw.Offset in o.Value + 1L))
-                            consumer.StoreOffsets[| tpo |]
+                            consumer.StoreOffset(tpo)
 
                             // decrement in-flight message counter
                             let batchSize = batch |> Array.sumBy approximateMessageBytes
@@ -313,7 +313,7 @@ type KafkaPartitionMetrics =
         [<JsonProperty("consumer_lag")>]
         consumerLag: int64 }        
 
-type KafkaConsumer private (log : ILogger, consumer : Consumer<string, string>, task : Task<unit>, cts : CancellationTokenSource) =
+type KafkaConsumer private (log : ILogger, consumer : IConsumer<string, string>, task : Task<unit>, cts : CancellationTokenSource) =
 
     /// Asynchronously awaits until consumer stops or is faulted
     member __.AwaitCompletion() = Async.AwaitTaskCorrect task
@@ -351,11 +351,14 @@ type KafkaConsumer private (log : ILogger, consumer : Consumer<string, string>, 
                                         if kpm.partition <> -1 then
                                             yield kpm }                
                             log.Information("Consuming... Stats {topic:l} | {@stats}", topic, metrics))
-                .SetRebalanceHandler(fun _c m ->
-                    for topic,partitions in m.Partitions |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
-                        if m.IsAssignment then log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions)
-                        else log.Information("Consuming... Revoked {topic:l} {partitions}", topic, partitions)
-                    if m.IsRevocation then m.Partitions |> Seq.iter partitionedCollection.Revoke)
+                .SetPartitionsAssignedHandler(fun _c xs ->
+                    for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
+                        log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions))
+                .SetPartitionsRevokedHandler(fun _c xs ->
+                    for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
+                        log.Information("Consuming... Revoked {topic:l} {partitions}", topic, partitions)
+                    for x in xs do
+                        partitionedCollection.Revoke(x.TopicPartition))
                 .SetOffsetsCommittedHandler(fun _c cos ->
                     for t,ps in cos.Offsets |> Seq.groupBy (fun p -> p.Topic) do
                         let o = [for p in ps -> let pp = p.Partition in pp.Value, let o = p.Offset in if o.IsSpecial then box (string o) else box o.Value(*, fmtError p.Error*)]
