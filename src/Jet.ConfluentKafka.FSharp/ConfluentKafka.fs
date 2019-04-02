@@ -20,11 +20,9 @@ module private Config =
 
         else u.Authority
 
-type Compression = Uncompressed | GZip | Snappy | LZ4 // as soon as CK provides such an Enum, this can go
-
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specfic settings
 [<NoComparison>]
-type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression : Compression, acks : Acks) =
+type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression, acks : Acks) =
     member val Conf : ProducerConfig = conf
     member val Acks = acks
     member val Broker = broker
@@ -33,8 +31,8 @@ type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression : Compre
 
     /// Creates a Kafka producer instance with supplied configuration
     static member Create
-        (   clientId : string, broker : Uri, acks : Acks,
-            /// Message compression. Defaults to Uncompressed/'none'.
+        (   clientId : string, broker : Uri, acks,
+            /// Message compression. Defaults to None
             ?compression,
             /// Maximum in-flight requests; <> 1 implies potential reordering of writes should a batch fail and then succeed in a subsequent retry. Defaults to 1.
             ?maxInFlight,
@@ -52,23 +50,20 @@ type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression : Compre
             ?partitioner,
             /// Misc configuration parameter to be passed to the underlying CK producer.
             ?custom) =
-        let compression = defaultArg compression Uncompressed
-        let cfgs = seq {
-            yield KeyValuePair("compression.codec", match compression with Uncompressed -> "none" | GZip -> "gzip" | Snappy -> "snappy" | LZ4 -> "lz4")
-            match custom with None -> () | Some miscConfig -> yield! miscConfig  }
         let c =
             ProducerConfig(
                 ClientId = clientId, BootstrapServers = Config.validateBrokerUri broker,
                 RetryBackoffMs = Nullable (match retryBackoff with Some (t : TimeSpan) -> int t.TotalMilliseconds | None -> 1000),
                 MessageSendMaxRetries = Nullable (defaultArg retries 60),
                 Acks = Nullable acks,
+                CompressionType = Nullable (defaultArg compression CompressionType.None),
                 LingerMs = Nullable (match linger with Some t -> int t.TotalMilliseconds | None -> 10),
                 SocketKeepaliveEnable = Nullable (defaultArg socketKeepAlive true),
                 Partitioner = Nullable (defaultArg partitioner Partitioner.ConsistentRandom),
                 MaxInFlight = Nullable (defaultArg maxInFlight 1000000),
                 LogConnectionClose = Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
         statisticsInterval |> Option.iter (fun (i : TimeSpan) -> c.StatisticsIntervalMs <- Nullable (int i.TotalMilliseconds))
-        KafkaProducerConfig(c, cfgs, broker, compression, acks)
+        KafkaProducerConfig(c, defaultArg custom Seq.empty, broker, compression, acks)
 
 type KafkaProducer private (log: ILogger, producer : IProducer<string, string>, topic : string) =
     member __.Topic = topic
@@ -104,7 +99,7 @@ type KafkaProducer private (log: ILogger, producer : IProducer<string, string>, 
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string) =
         if String.IsNullOrEmpty topic then nullArg "topic"
-        log.Information("Producing... {broker} / {topic} compression={compression:l} acks={acks}", config.Broker, topic, config.Compression, config.Acks)
+        log.Information("Producing... {broker} / {topic} compression={compression} acks={acks}", config.Broker, topic, config.Compression, config.Acks)
         let producer =
             ProducerBuilder<string, string>(config.Kvps)
                 .SetLogHandler(fun _p m -> log.Information("{message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
