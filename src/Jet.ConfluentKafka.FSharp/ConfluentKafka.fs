@@ -22,7 +22,7 @@ module private Config =
 
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specfic settings
 [<NoComparison>]
-type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression, acks : Acks) =
+type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression : CompressionType, acks : Acks) =
     member val Conf : ProducerConfig = conf
     member val Acks = acks
     member val Broker = broker
@@ -50,13 +50,14 @@ type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression, acks : 
             ?partitioner,
             /// Misc configuration parameter to be passed to the underlying CK producer.
             ?custom) =
+        let compression = defaultArg compression CompressionType.None
         let c =
             ProducerConfig(
                 ClientId = clientId, BootstrapServers = Config.validateBrokerUri broker,
                 RetryBackoffMs = Nullable (match retryBackoff with Some (t : TimeSpan) -> int t.TotalMilliseconds | None -> 1000),
                 MessageSendMaxRetries = Nullable (defaultArg retries 60),
                 Acks = Nullable acks,
-                CompressionType = Nullable (defaultArg compression CompressionType.None),
+                CompressionType = Nullable compression,
                 LingerMs = Nullable (match linger with Some t -> int t.TotalMilliseconds | None -> 10),
                 SocketKeepaliveEnable = Nullable (defaultArg socketKeepAlive true),
                 Partitioner = Nullable (defaultArg partitioner Partitioner.ConsistentRandom),
