@@ -104,11 +104,16 @@ module Config =
 
     let configs configs map = List.fold (fun m (k, v) -> config k v m) map configs
     let debug (debugFlag: seq<DebugFlags.DebugFlag>) configs =
-      let str =
-        debugFlag
-        |> Seq.map enumToString
-        |> String.concat ","
-      config "debug" str configs
+        if Seq.isEmpty debugFlag then
+            // Confluent throws an error if the debug flags array is empty,
+            // so in that case we don't set it.
+            configs 
+        else
+            let str =
+                debugFlag
+                |> Seq.map enumToString
+                |> String.concat ","
+            config "debug" str configs
 
     //
     // Strong typed
