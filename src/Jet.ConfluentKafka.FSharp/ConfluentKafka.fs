@@ -93,7 +93,7 @@ type KafkaProducer private (log: ILogger, producer : IProducer<string, string>, 
                 results.[i - 1] <- m
                 if i = numMessages then tcs.TrySetResult results |> ignore 
         for key,value in keyValueBatch do
-            producer.BeginProduce(topic, Message<_,_>(Key=key, Value=value), deliveryHandler = handler)
+            producer.Produce(topic, Message<_,_>(Key=key, Value=value), deliveryHandler = handler)
         producer.Flush(ct)
         log.Debug("Produced {count}",!numCompleted)
         return! Async.AwaitTaskCorrect tcs.Task }
