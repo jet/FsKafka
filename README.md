@@ -2,7 +2,7 @@
 
 F# friendly wrapper for `Confluent.Kafka` versions `>= 1.0.0`, with minimal dependencies or additional abstractions.
 
-**See also: [`v0` branch](https://github.com/jet/Jet.ConfluentKafka.FSharp/tree/v0), which targets `Confluent.Kafka` versions `0.9.*` and is designed for compatibility with the [Kafunk](https://github.com/jet/kafunk) API.**
+**See also: [`v0` branch](https://github.com/jet/Jet.ConfluentKafka.FSharp/tree/v0), which targets `Confluent.Kafka` versions `0.11.*` and is designed for compatibility with the [Kafunk](https://github.com/jet/kafunk) API.**
 
 ## QuickStart
 
