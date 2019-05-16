@@ -66,12 +66,25 @@ type KafkaProducerConfig private (conf, cfgs, broker : Uri, compression : Compre
         statisticsInterval |> Option.iter (fun (i : TimeSpan) -> c.StatisticsIntervalMs <- Nullable (int i.TotalMilliseconds))
         KafkaProducerConfig(c, defaultArg custom Seq.empty, broker, compression, acks)
 
-type KafkaProducer private (log: ILogger, producer : IProducer<string, string>, topic : string) =
+type KafkaProducer private (log: ILogger, inner : IProducer<string, string>, topic : string) =
     member __.Topic = topic
 
-    interface IDisposable with member __.Dispose() = for d in [(*d1;d2;*)producer:>IDisposable] do d.Dispose()
+    interface IDisposable with member __.Dispose() = inner.Dispose()
 
-    /// Produces a batch of supplied key/value messages. Results are returned in order of writing.  
+    /// Produces a single item, yielding a response upon completion/failure of the ack
+    /// <remarks>
+    ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
+    ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
+    member __.ProduceAsync(key, value) : Async<DeliveryResult<_,_>>= async {
+        return! inner.ProduceAsync(topic, Message<_,_>(Key=key, Value=value)) |> Async.AwaitTaskCorrect }
+
+    /// Produces a batch of supplied key/value messages. Results are returned in order of writing (which may vary from order of submission).
+    /// <throws>
+    ///    1. if there is an immediate local config issue
+    ///    2. upon receipt of the first failed `DeliveryReport` (NB without waiting for any further reports) </throws>
+    /// <remarks>
+    ///    Note that the delivery and/or write order may vary from the supplied order (unless you drop `maxInFlight` down to 1, massively constraining throughput).
+    ///    Thus it's important to note that supplying >1 item into the queue bearing the same key risks them being written to the topic out of order. <remarks/>
     member __.ProduceBatch(keyValueBatch : (string * string)[]) = async {
         if Array.isEmpty keyValueBatch then return [||] else
 
@@ -93,8 +106,8 @@ type KafkaProducer private (log: ILogger, producer : IProducer<string, string>, 
                 results.[i - 1] <- m
                 if i = numMessages then tcs.TrySetResult results |> ignore 
         for key,value in keyValueBatch do
-            producer.Produce(topic, Message<_,_>(Key=key, Value=value), deliveryHandler = handler)
-        producer.Flush(ct)
+            inner.Produce(topic, Message<_,_>(Key=key, Value=value), deliveryHandler = handler)
+        inner.Flush(ct)
         log.Debug("Produced {count}",!numCompleted)
         return! Async.AwaitTaskCorrect tcs.Task }
 
