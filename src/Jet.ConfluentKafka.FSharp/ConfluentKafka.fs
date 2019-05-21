@@ -296,7 +296,7 @@ type KafkaConsumerConfig = private { conf: ConsumerConfig; custom: seq<KeyValueP
                 EnableAutoOffsetStore = Nullable false,
                 LogConnectionClose = Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
         statisticsInterval |> Option.iter (fun (i : TimeSpan) -> conf.StatisticsIntervalMs <- Nullable (int i.TotalMilliseconds))
-        {   conf = conf; custom = match custom with None -> Seq.empty | Some c -> List.toSeq c
+        {   conf = conf; custom = defaultArg custom Seq.empty
             topics = match Seq.toList topics with [] -> invalidArg "topics" "must be non-empty collection" | ts -> ts
             buffering = {
                 maxBatchSize = defaultArg maxBatchSize 1000
