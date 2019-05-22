@@ -38,8 +38,8 @@ type KafkaProducerConfig private (inner, broker : Uri) =
             /// Maximum in-flight requests. Default: 1_000_000.
             /// NB <> 1 implies potential reordering of writes should a batch fail and then succeed in a subsequent retry
             ?maxInFlight,
-            /// Time to wait for other items to be produced before sending a batch. Confluent.Kafka default: 0ms. Default 0ms
-            /// NB the linger setting alone does provide any hard guarantees; see KafkaBatchProducer.CreateWithBatchingOverrides
+            /// Time to wait for other items to be produced before sending a batch. Default: 0ms
+            /// NB the linger setting alone does provide any hard guarantees; see BatchedProducer.CreateWithConfigOverrides
             ?linger : TimeSpan,
             /// Number of retries. Confluent.Kafka default: 2. Default: 60.
             ?retries,
@@ -61,10 +61,10 @@ type KafkaProducerConfig private (inner, broker : Uri) =
                 RetryBackoffMs = Nullable (match retryBackoff with Some (t : TimeSpan) -> int t.TotalMilliseconds | None -> 1000), // CK default 100ms
                 MessageSendMaxRetries = Nullable (defaultArg retries 60), // default 2
                 Acks = Nullable acks,
-                LingerMs = Nullable (match linger with Some t -> int t.TotalMilliseconds | None -> 10), // default 0
                 SocketKeepaliveEnable = Nullable (defaultArg socketKeepAlive true), // default: false
                 LogConnectionClose = Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
         maxInFlight |> Option.iter (fun x -> c.MaxInFlight <- Nullable x) // default 1_000_000
+        linger |> Option.iter<TimeSpan> (fun x -> c.LingerMs <- Nullable (int x.TotalMilliseconds)) // default 0
         partitioner |> Option.iter (fun x -> c.Partitioner <- x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable (int x.TotalMilliseconds))
@@ -73,7 +73,7 @@ type KafkaProducerConfig private (inner, broker : Uri) =
         KafkaProducerConfig(c, broker)
 
 /// Creates and wraps a Confluent.Kafka Producer with the supplied configuration
-type KafkaProducer private (log, inner : IProducer<string, string>, topic : string) =
+type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     member __.Inner = inner
     member __.Topic = topic
 
@@ -88,14 +88,20 @@ type KafkaProducer private (log, inner : IProducer<string, string>, topic : stri
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string): KafkaProducer =
         if String.IsNullOrEmpty topic then nullArg "topic"
-        log.Information("Producing... {broker} / {topic} compression={compression} maxInFlight={maxInFlight} acks={acks} lingerMs={linger}",
-            config.Broker, topic, config.Compression, config.MaxInFlight, config.Acks, (let l = config.Inner.LingerMs in l.Value))
+        log.Information("Producing... {broker} / {topic} compression={compression} maxInFlight={maxInFlight} acks={acks}",
+            config.Broker, topic, config.Compression, config.MaxInFlight, config.Acks)
         let p =
             ProducerBuilder<string, string>(config.Inner)
                 .SetLogHandler(fun _p m -> log.Information("{message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
                 .SetErrorHandler(fun _p e -> log.Error("{reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
                 .Build()
-        new KafkaProducer(log, p, topic)
+        new KafkaProducer(p, topic)
+
+type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, topic : string) =
+    member __.Inner = inner
+    member __.Topic = topic
+
+    interface IDisposable with member __.Dispose() = inner.Dispose()
 
     /// Produces a batch of supplied key/value messages. Results are returned in order of writing (which may vary from order of submission).
     /// <throws>
@@ -130,8 +136,28 @@ type KafkaProducer private (log, inner : IProducer<string, string>, topic : stri
         log.Debug("Produced {count}",!numCompleted)
         return! Async.AwaitTaskCorrect tcs.Task }
 
+    /// Creates and wraps a Confluent.Kafka Producer that affords a batched production mode.
+    /// The default settings represent a best effort at providing batched, ordered delivery semantics
+    /// NB See caveats on the `ProduceBatch` API for further detail as to the semantics
+    static member CreateWithConfigOverrides
+        (   log : ILogger, config : KafkaProducerConfig, topic : string,
+            /// Default: 1
+            /// NB Having a <> 1 value for maxInFlight runs two risks due to the intrinsic lack of
+            /// batching mechanisms within the Confluent.Kafka client:
+            /// 1) items within the initial 'batch' can get written out of order in the face of timeouts and/or retries
+            /// 2) items beyond the linger period may enter a separate batch, which can potentially get scheduled for transmission out of order
+            ?maxInFlight,
+            // This is used successfully in production with a 10ms linger value; having it in place is critical to items getting into the correct groupings. Default: 10ms
+            ?linger: TimeSpan) : BatchedProducer =
+        let lingerMs = match linger with Some x -> int x.TotalMilliseconds | None -> 100
+        log.Information("Producing... Using batch Mode with linger={lingerMs}", lingerMs)
+        config.Inner.LingerMs <- Nullable lingerMs
+        config.Inner.MaxInFlight <- Nullable (defaultArg maxInFlight 1)
+        let inner = KafkaProducer.Create(log, config, topic)
+        new BatchedProducer(log, inner.Inner, topic)
+
 type ConsumerBufferingConfig = { minInFlightBytes : int64; maxInFlightBytes : int64; maxBatchSize : int; maxBatchDelay : TimeSpan }
-   
+
 module private ConsumerImpl =
     /// guesstimate approximate message size in bytes
     let approximateMessageBytes (message : ConsumeResult<string, string>) =
@@ -337,7 +363,7 @@ type KafkaPartitionMetrics =
 /// Creates and wraps a Confluent.Kafka IConsumer, wrapping it to afford a batched consumption mode with implicit offset progression at the end of each
 /// (parallel across partitions, sequenced/monotinic within) batch of processing carried out by the `partitionHandler`
 /// When the `partionHandler` throws and/or `Stop()` is called, conclusion can be awaited by via `AwaitCompletion()`
-type KafkaConsumer private (log : ILogger, inner : IConsumer<string, string>, task : Task<unit>, cts : CancellationTokenSource) =
+type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, task : Task<unit>, cts : CancellationTokenSource) =
     member __.Inner = inner
 
     interface IDisposable with member __.Dispose() = __.Stop()
@@ -355,7 +381,7 @@ type KafkaConsumer private (log : ILogger, inner : IConsumer<string, string>, ta
     /// Batches are grouped by topic partition. Batches belonging to the same topic partition will be scheduled sequentially and monotonically,
     /// however batches from different partitions can be run concurrently.
     /// Yielding an exception from the `partitionHandler` terminates the processing
-    static member Start (log : ILogger) (config : KafkaConsumerConfig) (partitionHandler : ConsumeResult<string,string>[] -> Async<unit>) =
+    static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>) =
         if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
         log.Information("Consuming... {broker} {topics} {groupId}" (*autoOffsetReset={autoOffsetReset}*) + " fetchMaxBytes={fetchMaxB} maxInFlightBytes={maxInFlightB} maxBatchSize={maxBatchB} maxBatchDelay={maxBatchDelay}s",
             config.inner.BootstrapServers, config.topics, config.inner.GroupId, (*config.conf.AutoOffsetReset.Value,*) config.inner.FetchMaxBytes,
@@ -397,11 +423,11 @@ type KafkaConsumer private (log : ILogger, inner : IConsumer<string, string>, ta
         consumer.Subscribe config.topics
         let cts = new CancellationTokenSource()
         let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionedCollection partitionHandler |> Async.StartAsTask
-        new KafkaConsumer(log, consumer, task, cts)
+        new BatchedConsumer(log, consumer, task, cts)
 
     /// Starts a Kafka consumer instance that schedules handlers grouped by message key. Additionally accepts a global degreeOfParallelism parameter
     /// that controls the number of handlers running concurrently across partitions for the given consumer instance.
-    static member StartByKey (log: ILogger) (config : KafkaConsumerConfig) (degreeOfParallelism : int) (keyHandler : ConsumeResult<_,_> [] -> Async<unit>) =
+    static member StartByKey(log: ILogger, config : KafkaConsumerConfig, degreeOfParallelism : int, keyHandler : ConsumeResult<_,_> [] -> Async<unit>) =
         let semaphore = new SemaphoreSlim(degreeOfParallelism)
         let partitionHandler (messages : ConsumeResult<_,_>[]) = async {
             return!
@@ -416,4 +442,4 @@ type KafkaConsumer private (log : ILogger, inner : IConsumer<string, string>, ta
                 |> Async.Ignore
         }
 
-        KafkaConsumer.Start log config partitionHandler
+        BatchedConsumer.Start(log, config, partitionHandler)
