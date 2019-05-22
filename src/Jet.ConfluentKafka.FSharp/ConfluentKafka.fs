@@ -89,7 +89,7 @@ type KafkaProducer private (log, inner : IProducer<string, string>, topic : stri
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string): KafkaProducer =
         if String.IsNullOrEmpty topic then nullArg "topic"
         log.Information("Producing... {broker} / {topic} compression={compression} maxInFlight={maxInFlight} acks={acks} lingerMs={linger}",
-            config.Broker, topic, config.Compression, config.MaxInFlight, config.Acks, config.Inner.LingerMs.Value)
+            config.Broker, topic, config.Compression, config.MaxInFlight, config.Acks, (let l = config.Inner.LingerMs in l.Value))
         let p =
             ProducerBuilder<string, string>(config.Inner)
                 .SetLogHandler(fun _p m -> log.Information("{message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
