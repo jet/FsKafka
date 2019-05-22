@@ -158,6 +158,9 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
 
 type ConsumerBufferingConfig = { minInFlightBytes : int64; maxInFlightBytes : int64; maxBatchSize : int; maxBatchDelay : TimeSpan }
 
+module Constants =
+    let messageCounterSourceContext = "Jet.ConfluentKafka.FSharp.InFlightMessageCounter"
+
 module private ConsumerImpl =
     /// guesstimate approximate message size in bytes
     let approximateMessageBytes (message : ConsumeResult<string, string>) =
@@ -217,9 +220,9 @@ module private ConsumerImpl =
 
         member __.AwaitThreshold() =
             if inFlightBytes > maxInFlightBytes then
-                log.Warning("Consumer reached in-flight message threshold, breaking off polling, bytes={max}", inFlightBytes)
+                log.Information("Consumer reached in-flight message threshold, breaking off polling, bytes={max}", inFlightBytes)
                 while inFlightBytes > minInFlightBytes do Thread.Sleep 5
-                log.Information "Consumer resuming polling"
+                log.Verbose "Consumer resuming polling"
 
     let mkBatchedMessageConsumer (log: ILogger) (buf : ConsumerBufferingConfig) (ct : CancellationToken) (consumer : IConsumer<string, string>)
             (partitionedCollection: PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>)
@@ -230,7 +233,8 @@ module private ConsumerImpl =
 
         use _ = consumer
         
-        let counter = new InFlightMessageCounter(log, buf.minInFlightBytes, buf.maxInFlightBytes)
+        let mcLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Constants.messageCounterSourceContext)
+        let counter = new InFlightMessageCounter(mcLog, buf.minInFlightBytes, buf.maxInFlightBytes)
 
         // starts a tail recursive loop that dequeues batches for a given partition buffer and schedules the user callback
         let consumePartition (collection : BlockingCollection<ConsumeResult<string, string>>) =
