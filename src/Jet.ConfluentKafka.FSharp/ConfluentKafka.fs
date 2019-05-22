@@ -381,14 +381,15 @@ type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, 
     /// Asynchronously awaits until consumer stops or is faulted
     member __.AwaitCompletion() = Async.AwaitTaskCorrect task
 
-    /// Starts a kafka consumer with provider configuration and batch message handler.
+    /// Starts a kafka consumer with the supplied configuration and message batch handler.
     /// Batches are grouped by topic partition. Batches belonging to the same topic partition will be scheduled sequentially and monotonically,
     /// however batches from different partitions can be run concurrently.
-    /// Yielding an exception from the `partitionHandler` terminates the processing
+    /// Batches that `partionHandler` processes successfully get submitted for asynchronous periodic committing.
+    /// Yielding an Exception from the `partitionHandler` terminates the processing.
     static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>) =
         if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
-        log.Information("Consuming... {broker} {topics} {groupId}" (*autoOffsetReset={autoOffsetReset}*) + " fetchMaxBytes={fetchMaxB} maxInFlightBytes={maxInFlightB} maxBatchSize={maxBatchB} maxBatchDelay={maxBatchDelay}s",
-            config.inner.BootstrapServers, config.topics, config.inner.GroupId, (*config.conf.AutoOffsetReset.Value,*) config.inner.FetchMaxBytes,
+        log.Information("Consuming... {broker} {topics} {groupId} autoOffsetReset={autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlightBytes={maxInFlightB} maxBatchSize={maxBatchB} maxBatchDelay={maxBatchDelay}s",
+            config.inner.BootstrapServers, config.topics, config.inner.GroupId, (let x = config.inner.AutoOffsetReset in x.Value), config.inner.FetchMaxBytes,
             config.buffering.maxInFlightBytes, config.buffering.maxBatchSize, (let t = config.buffering.maxBatchDelay in t.TotalSeconds))
 
         let partitionedCollection = new ConsumerImpl.PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>()
