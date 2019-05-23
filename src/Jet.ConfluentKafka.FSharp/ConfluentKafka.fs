@@ -277,12 +277,12 @@ module private ConsumerImpl =
         let ct = cts.Token
         try while not ct.IsCancellationRequested do
                 counter.AwaitThreshold()
-                try let message = consumer.Consume(cts.Token) // NB don't use TimeSpan overload unless you want AVEs on1.0.0-beta2
+                try let message = consumer.Consume(cts.Token) // NB TimeSpan overload yields AVEs on 1.0.0-beta2
                     if message <> null then
                         counter.Add(approximateMessageBytes message)
                         partitionedCollection.Add(message.TopicPartition, message)
-                with| :? ConsumeException as e -> log.Warning(e, "Consume exception")
-                    | :? System.OperationCanceledException -> log.Warning("Consumer:{name} | Consuming cancelled", consumer.Name)
+                with| :? ConsumeException as e -> log.Warning(e, "Consuming... exception {name}", consumer.Name)
+                    | :? System.OperationCanceledException -> log.Warning("Consuming... cancelled {name}", consumer.Name)
         finally
             consumer.Close()
         
@@ -345,7 +345,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
                 maxBatchDelay = defaultArg maxBatchDelay (TimeSpan.FromMilliseconds 500.)
                 minInFlightBytes = defaultArg minInFlightBytes (16L * 1024L * 1024L)
                 maxInFlightBytes = defaultArg maxInFlightBytes (24L * 1024L * 1024L) } }
-                
+
 // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
 type KafkaPartitionMetrics =
     {   partition: int
@@ -366,7 +366,7 @@ type KafkaPartitionMetrics =
 
 /// Creates and wraps a Confluent.Kafka IConsumer, wrapping it to afford a batched consumption mode with implicit offset progression at the end of each
 /// (parallel across partitions, sequenced/monotinic within) batch of processing carried out by the `partitionHandler`
-/// When the `partionHandler` throws and/or `Stop()` is called, conclusion can be awaited by via `AwaitCompletion()`
+/// Conclusion of the processing (when a `partionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
 type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, task : Task<unit>, cts : CancellationTokenSource) =
     member __.Inner = inner
 
@@ -374,18 +374,15 @@ type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, 
     /// Request cancellation of processing
     member __.Stop() =  
         log.Information("Consuming ... Stopping {name}", inner.Name)
-        cts.Cancel();  
-
+        cts.Cancel()
     /// Inspects current status of processing task
     member __.Status = task.Status
     /// Asynchronously awaits until consumer stops or is faulted
     member __.AwaitCompletion() = Async.AwaitTaskCorrect task
 
-    /// Starts a kafka consumer with the supplied configuration and message batch handler.
-    /// Batches are grouped by topic partition. Batches belonging to the same topic partition will be scheduled sequentially and monotonically,
-    /// however batches from different partitions can be run concurrently.
-    /// Batches that `partionHandler` processes successfully get submitted for asynchronous periodic committing.
-    /// Yielding an Exception from the `partitionHandler` terminates the processing.
+    /// Starts a Kafka consumer with the provided configuration. Batches are grouped by topic partition.
+    /// Batches belonging to the same topic partition will be scheduled sequentially and monotonically; however batches from different partitions can run concurrently.
+    /// Completion of the `partitionHandler` saves the attained offsets so the auto-commit can mark progress; yielding an exception terminates the processing
     static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>) =
         if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
         log.Information("Consuming... {broker} {topics} {groupId} autoOffsetReset={autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlightBytes={maxInFlightB} maxBatchSize={maxBatchB} maxBatchDelay={maxBatchDelay}s",
@@ -395,7 +392,7 @@ type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, 
         let partitionedCollection = new ConsumerImpl.PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>()
         let consumer =
             ConsumerBuilder<_,_>(config.inner)
-                .SetLogHandler(fun _c m -> log.Information("consumer_info|{message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
+                .SetLogHandler(fun _c m -> log.Information("consumer_info {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
                 .SetErrorHandler(fun _c e -> log.Error("Consuming... Error reason={reason} code={code} broker={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
                 .SetStatisticsHandler(fun _c json -> 
                     // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
@@ -409,7 +406,7 @@ type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, 
                                         let kpm = tm.First.ToObject<KafkaPartitionMetrics>()
                                         if kpm.partition <> -1 then
                                             yield kpm }                
-                            log.Information("Consuming... Stats {topic:l} | {@stats}", topic, metrics))
+                            log.Information("Consuming... Stats {topic:l} {@stats}", topic, metrics))
                 .SetPartitionsAssignedHandler(fun _c xs ->
                     for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
                         log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions))
