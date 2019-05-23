@@ -255,11 +255,8 @@ module private ConsumerImpl =
                             do! handler batch
 
                             // store completed offsets
-                            let tpo =
-                                let maxOffset = batch |> Array.maxBy (fun m -> let o = m.Offset in o.Value)
-                                let raw = maxOffset.TopicPartitionOffset
-                                TopicPartitionOffset(raw.Topic, raw.Partition, Offset(let o = raw.Offset in o.Value + 1L))
-                            consumer.StoreOffset(tpo)
+                            let lastItem = batch |> Array.maxBy (fun m -> let o = m.Offset in o.Value)
+                            consumer.StoreOffset(lastItem)
 
                             // decrement in-flight message counter
                             let batchSize = batch |> Array.sumBy approximateMessageBytes
@@ -274,14 +271,13 @@ module private ConsumerImpl =
         use _ = partitionedCollection.OnPartitionAdded.Subscribe (fun (_key,buffer) -> consumePartition buffer)
 
         // run the consumer
-        let ct = cts.Token
         try while not ct.IsCancellationRequested do
                 counter.AwaitThreshold()
                 try let message = consumer.Consume(cts.Token) // NB TimeSpan overload yields AVEs on 1.0.0-beta2
                     if message <> null then
                         counter.Add(approximateMessageBytes message)
                         partitionedCollection.Add(message.TopicPartition, message)
-                with| :? ConsumeException as e -> log.Warning(e, "Consuming... exception {name}", consumer.Name)
+                with| :? ConsumeException as e -> log.Warning(e, "Consuming ... exception {name}", consumer.Name)
                     | :? System.OperationCanceledException -> log.Warning("Consuming... cancelled {name}", consumer.Name)
         finally
             consumer.Close()
