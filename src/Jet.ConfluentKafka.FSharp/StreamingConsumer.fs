@@ -117,6 +117,7 @@ module Scheduling =
         let mutable cycles, processingDuration = 0, TimeSpan.Zero
         let startedBatches, completedBatches, startedItems, completedItems  = PartitionStats(), PartitionStats(), PartitionStats(), PartitionStats()
         let dumpStats () =
+            // TODO
             logExternalStats |> Option.iter (fun f -> f log)
         let maybeLogStats : unit -> bool =
             cycles <- cycles + 1
