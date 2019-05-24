@@ -20,6 +20,7 @@ module private Helpers =
             match partitions.TryGetValue partition with
             | true, catCount -> partitions.[partition] <- catCount + weight
             | false, _ -> partitions.[partition] <- weight
+        member __.Raw : seq<KeyValuePair<_,_>> = partitions :> _
         member __.Clear() = partitions.Clear()
     #if NET461
         member __.StatsDescending = partitions |> Seq.map (|KeyValue|) |> Seq.sortBy (fun (_,s) -> -s)
@@ -92,8 +93,8 @@ module Scheduling =
         member private __.RecordOk(duration : TimeSpan) =
             __.RecordDurationFirst duration
             Interlocked.Decrement(&__.remaining) |> ignore
-        member private __.RecordExn(duration,exn) =
-            __.RecordDurationFirst duration
+        member private __.RecordExn(_duration,exn) =
+            // Do not record duration or it will mess stats in current implementation //__.RecordDurationFirst duration
             __.faults.Push exn
         static member Create(batch : Batch<'M>, handle) : WipBatch<'M> * seq<Async<unit>> =
             let x = { elapsedMs = 0L; remaining = batch.messages.Length; faults = ConcurrentStack(); batch = batch }
@@ -110,20 +111,33 @@ module Scheduling =
         | { faults = f } when not f.IsEmpty -> Faulted (f.ToArray())
         | _ -> Busy
 
-    type Scheduler<'M>(log : ILogger, tcs : TaskCompletionSource<unit>, handle, tryDispatch : (Async<unit>) -> bool, statsInterval, ?logExternalStats) =
-        let incoming = ConcurrentQueue<Batch<'M>[]>()
+    type Engine<'M>(log : ILogger, handle, tryDispatch : (Async<unit>) -> bool, statsInterval, ?logExternalStats) =
+        let incoming = ConcurrentQueue<Batch<'M>>()
         let waiting = Queue<Async<unit>>(1024)
         let activeByPartition = Dictionary<int,Queue<WipBatch<'M>>>()
         let mutable cycles, processingDuration = 0, TimeSpan.Zero
-        let startedBatches, completedBatches, startedItems, completedItems  = PartitionStats(), PartitionStats(), PartitionStats(), PartitionStats()
+        let startedBatches, completedBatches, startedItems, completedItems = PartitionStats(), PartitionStats(), PartitionStats(), PartitionStats()
         let dumpStats () =
-            // TODO
+            let startedB, completedB = Array.ofSeq startedBatches.StatsDescending, Array.ofSeq completedBatches.StatsDescending
+            let startedI, completedI = Array.ofSeq startedItems.StatsDescending, Array.ofSeq completedItems.StatsDescending
+            let totalItemsCompleted = Array.sumBy snd completedI
+            let latencyMs = match totalItemsCompleted with 0L -> null | cnt -> box (processingDuration.TotalMilliseconds / float cnt)
+            log.Information("Scheduler {cycles} cycles Started {startedBatches}b {startedItems}i Completed {completedBatches}b {completedItems}i latency {completedLatency:f1}ms Ready {readyitems} Waiting {waitingBatches}b",
+                cycles, Array.sumBy snd startedB, Array.sumBy snd startedI, Array.sumBy snd completedB, totalItemsCompleted, latencyMs, waiting.Count, incoming.Count)
+            let active =
+                seq { for KeyValue(pid,q) in activeByPartition -> pid, q |> Seq.sumBy (fun x -> x.remaining) }
+                |> Seq.filter (fun (_,snd) -> snd <> 0)
+                |> Seq.sortBy (fun (_,snd) -> -snd)
+            log.Information("Partitions Active items {@active} Started batches {@startedBatches} items {@startedItems} Completed batches {@completedBatches} items {@completedItems}",
+                active, startedB, startedI, completedB, completedI)
+            cycles <- 0; startedBatches.Clear(); completedBatches.Clear(); startedItems.Clear(); completedItems.Clear(); processingDuration <- TimeSpan.Zero
             logExternalStats |> Option.iter (fun f -> f log)
         let maybeLogStats : unit -> bool =
-            cycles <- cycles + 1
             let due = intervalCheck statsInterval
-            fun () -> if due () then dumpStats (); true else false
-        let drainCompleted () =
+            fun () ->
+                cycles <- cycles + 1
+                if due () then dumpStats (); true else false
+        let drainCompleted (cts : CancellationTokenSource, tcs : TaskCompletionSource<unit>) =
             let mutable more, worked = true, false
             while more do
                 more <- false
@@ -135,6 +149,7 @@ module Scheduling =
                         let effExn = AggregateException(exns).Flatten()
                         // outer layers will react to this by tearing us down
                         // this is no reason not to continue processing other partitions
+                        cts.Cancel()
                         tcs.TrySetException(effExn) |> ignore
                     | Some (Completed batchProcessingDuration) ->
                         let partitionId, markCompleted, itemCount =
@@ -150,15 +165,14 @@ module Scheduling =
         let tryPrepareNext () =
             match incoming.TryDequeue() with
             | false, _ -> false
-            | true, batches ->
-                for ({ partitionIndex = pid; messages = msgs} as batch) in batches do
-                    startedBatches.Ingest(pid)
-                    startedItems.Ingest(pid, msgs.LongLength)
-                    let wipBatch, runners = WipBatch.Create(batch, handle)
-                    runners |> Seq.iter waiting.Enqueue
-                    match activeByPartition.TryGetValue pid with
-                    | false, _ -> let q = Queue(1024) in activeByPartition.[pid] <- q; q.Enqueue wipBatch
-                    | true, q -> q.Enqueue wipBatch
+            | true, ({ partitionIndex = pid; messages = msgs} as batch) ->
+                startedBatches.Ingest(pid)
+                startedItems.Ingest(pid, msgs.LongLength)
+                let wipBatch, runners = WipBatch.Create(batch, handle)
+                runners |> Seq.iter waiting.Enqueue
+                match activeByPartition.TryGetValue pid with
+                | false, _ -> let q = Queue(1024) in activeByPartition.[pid] <- q; q.Enqueue wipBatch
+                | true, q -> q.Enqueue wipBatch
                 true
         let queueWork () =
             let mutable more, worked = true, false
@@ -174,15 +188,15 @@ module Scheduling =
                         more <- false 
             worked
 
-        member __.Pump() = async {
+        member __.Pump(cts : CancellationTokenSource, tcs : TaskCompletionSource<unit>) = async {
             let! ct = Async.CancellationToken
             while not ct.IsCancellationRequested do
-                let hadResults = drainCompleted ()
+                let hadResults = drainCompleted (cts, tcs)
                 let queuedWork = queueWork ()
                 let loggedStats = maybeLogStats ()
                 if not hadResults && not queuedWork && not loggedStats then
                     Thread.Sleep 1 } // not Async.Sleep, we like this context and/or cache state if nobody else needs it
-        member __.Submit(batches : Batch<'M>[]) =
+        member __.Submit(batches : Batch<'M>) =
             incoming.Enqueue batches
 
 module Submission =
@@ -201,14 +215,15 @@ module Submission =
         let mutable cycles, ingested = 0, 0
         let submittedBatches,submittedMessages = PartitionStats(), PartitionStats()
         let dumpStats () =
-            let waiting = seq { for x in buffer -> x.Key, x.Value.queue.Count } |> Seq.sortBy (fun (_,snd) -> -snd)
-            log.Information("Ingested {ingested} in {cycles} cycles Waiting {@waiting} Batches {@batches} Messages {@messages}",
-                ingested, cycles, waiting, submittedBatches.StatsDescending, submittedMessages.StatsDescending)
+            let waiting = seq { for x in buffer do if x.Value.queue.Count <> 0 then yield x.Key, x.Value.queue.Count } |> Seq.sortBy (fun (_,snd) -> -snd)
+            log.Information("Submitter {cycles} cycles Ingested {ingested} Waiting {@waiting} Batches {@batches} Messages {@messages}",
+                cycles, ingested, waiting, submittedBatches.StatsDescending, submittedMessages.StatsDescending)
             ingested <- 0; cycles <- 0; submittedBatches.Clear(); submittedMessages.Clear()
         let maybeLogStats =
-            cycles <- cycles + 1
             let due = intervalCheck statsInterval
-            fun () -> if due () then dumpStats ()
+            fun () ->
+                cycles <- cycles + 1
+                if due () then dumpStats ()
         // Loop, submitting 0 or 1 item per partition per iteration to ensure
         // - each partition has a controlled maximum number of entrants in the scheduler queue
         // - a fair ordering of batch submissions
@@ -293,7 +308,7 @@ module Ingestion =
         let mutable intervalMsgs, intervalChars, totalMessages, totalChars = 0L, 0L, 0L, 0L
         let dumpStats () =
             totalMessages <- totalMessages + intervalMsgs; totalChars <- totalChars + intervalChars
-            log.Information("Ingested {msgs:n0} messages, {chars:n0} In-flight ~{inflightMb:n1}MB Total {totalMessages:n0} messages {totalChars:n0} chars",
+            log.Information("Ingested {msgs:n0} messages, {chars:n0} chars In-flight ~{inflightMb:n1}MB Total {totalMessages:n0} messages {totalChars:n0} chars",
                 intervalMsgs, intervalChars, counter.InFlightMb, totalMessages, totalChars)
             intervalMsgs <- 0L; intervalChars <- 0L
         let maybeLogStats =
@@ -361,26 +376,30 @@ type StreamingConsumer private (log : ILogger, inner : IConsumer<string, string>
         let statsInterval = defaultArg statsInterval (TimeSpan.FromMinutes 5.)
 
         let dispatcher = Scheduling.Dispatcher dop
-        let tcs = new TaskCompletionSource<unit>()
-        let scheduler = Scheduling.Scheduler<'M>(log, tcs, handle, dispatcher.TryAdd, statsInterval, ?logExternalStats=logExternalStats)
+        let scheduler = Scheduling.Engine<'M>(log, handle, dispatcher.TryAdd, statsInterval, ?logExternalStats=logExternalStats)
         let limiterLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Core.Constants.messageCounterSourceContext)
         let limiter = new Ingestion.InFlightMessageCounter(limiterLog, config.buffering.minInFlightBytes, config.buffering.maxInFlightBytes)
         let consumer = ConsumerBuilder.WithLogging(log, config) // teardown is managed by ingester.Pump()
-        let ingester = Ingestion.Engine<'M>(log, limiter, consumer, mapResult, scheduler.Submit, emitInterval = config.buffering.maxBatchDelay, statsInterval = statsInterval)
+        let submitter = Submission.Engine(log, 5, 10, scheduler.Submit, statsInterval)
+        let ingester = Ingestion.Engine<'M>(log, limiter, consumer, mapResult, submitter.Submit, emitInterval = config.buffering.maxBatchDelay, statsInterval = statsInterval)
         let run (name : string) computation = async {
             try do! computation
                 log.Information("Exiting {name}", name)
             with e -> log.Fatal(e, "Abend from {name}", name) }
         let cts = new CancellationTokenSource()
         let machine = async {
-            use _ = let ct = cts.Token in ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
+            let! ct = Async.CancellationToken
+            use cts = CancellationTokenSource.CreateLinkedTokenSource(ct)
+            let tcs = new TaskCompletionSource<unit>()
+            use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
             let! _ = Async.StartChild <| run "dispatcher" (dispatcher.Pump())
+            let! _ = Async.StartChild <| run "scheduler" (scheduler.Pump(cts, tcs))
+            let! _ = Async.StartChild <| run "submitter" (submitter.Pump())
             let! _ = Async.StartChild <| run "ingester" (ingester.Pump())
-            let! _ = Async.StartChild <| run "scheduler" (scheduler.Pump())
             // await for handler faults or external cancellation
             do! Async.AwaitTaskCorrect tcs.Task
         }
-        let task = Async.StartAsTask machine
+        let task = Async.StartAsTask(machine, cancellationToken = cts.Token)
         new StreamingConsumer(log, consumer, task, cts)
 
     interface IDisposable with member __.Dispose() = __.Stop()

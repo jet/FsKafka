@@ -24,7 +24,7 @@ module Helpers =
             use writer = new System.IO.StringWriter()
             formatter.Format(logEvent, writer);
             writer |> string |> testOutput.WriteLine
-            writer |> string |> System.Diagnostics.Debug.WriteLine
+            writer |> string |> System.Diagnostics.Debug.Write
         interface Serilog.Core.ILogEventSink with member __.Emit logEvent = writeSerilogEvent logEvent
 
     let createLogger sink =
@@ -99,7 +99,7 @@ module Helpers =
                 | Some c -> c
 
             let handle item = handler (getConsumer()) (deserialize item)
-            let consumer = StreamingConsumer.Start(log, config, id, handle, dop = 1024)
+            let consumer = StreamingConsumer.Start(log, config, id, handle, dop = 1024, statsInterval = TimeSpan.FromSeconds 10.)
 
             consumerCell := Some consumer
 
