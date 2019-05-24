@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Include="Infrastructure.fs" />
     <Compile Include="ConfluentKafka.fs" />
+    <Compile Include="StreamingConsumer.fs" />
   </ItemGroup>
 
   <ItemGroup>
