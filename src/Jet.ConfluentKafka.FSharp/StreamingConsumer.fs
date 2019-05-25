@@ -398,8 +398,6 @@ type StreamingConsumer private (inner : IConsumer<string, string>, task : Task<u
         let cts = new CancellationTokenSource()
         let ct = cts.Token
         let tcs = new TaskCompletionSource<unit>()
-        // external cancellation should yield a success result
-        use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
         let start name f =
             let wrap (name : string) computation = async {
                 try do! computation
@@ -414,6 +412,8 @@ type StreamingConsumer private (inner : IConsumer<string, string>, task : Task<u
             cts.Cancel()
 
         let machine = async {
+            // external cancellation should yield a success result
+            use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
             start "dispatcher" <| dispatcher.Pump()
             start "scheduler" <| scheduler.Pump abend
             start "submitter" <| submitter.Pump()
