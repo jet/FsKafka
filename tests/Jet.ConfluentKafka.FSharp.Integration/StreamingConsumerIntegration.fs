@@ -99,7 +99,7 @@ module Helpers =
                 | Some c -> c
 
             let handle item = handler (getConsumer()) (deserialize item)
-            let consumer = StreamingConsumer.Start(log, config, id, handle, dop = 1024, statsInterval = TimeSpan.FromSeconds 10.)
+            let consumer = StreamingConsumer.Start(log, config, id, handle, executingMaxDop = 1024, statsInterval = TimeSpan.FromSeconds 10.)
 
             consumerCell := Some consumer
 
@@ -181,8 +181,11 @@ type T2(testOutputHelper) =
 
         let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId)
         
-        let! r = Async.Catch <| runConsumers log config 1 None (fun _ _ -> raise <|IndexOutOfRangeException())
-        test <@ match r with Choice2Of2 (:? IndexOutOfRangeException) -> true | x -> failwithf "%A" x @>
+        let! r = Async.Catch <| runConsumers log config 1 None (fun _ _ -> Async.Catch <| async { return raise <|IndexOutOfRangeException() })
+        test <@ match r with
+                | Choice2Of2 (:? IndexOutOfRangeException) -> true
+                | Choice2Of2 (:? AggregateException as ae) -> ae.InnerExceptions |> Seq.forall (function (:? IndexOutOfRangeException) -> true | _ -> false)
+                | x -> failwithf "%A" x @>
     }
 
     let [<FactIfBroker>] ``Given a topic different consumer group ids should be consuming the same message set`` () = async {
@@ -272,10 +275,9 @@ type T3(testOutputHelper) =
         test <@ numMessages = !messageCount @>
     }
 
-    let [<FactIfBroker>] ``Consumers should never schedule two batches of the same partition concurrently`` () = async {
+    let [<FactIfBroker>] ``Consumers should schedule two batches of the same partition concurrently`` () = async {
         // writes 2000 messages down a topic with a shuffled partition key
-        // then attempts to consume the topic, while verifying that per-partition batches
-        // are never scheduled for concurrent execution. also checks that batches are
+        // then attempts to consume the topic, checking that batches are
         // monotonic w.r.t. offsets
         let numMessages = 2000
         let maxBatchSize = 5
@@ -296,6 +298,9 @@ type T3(testOutputHelper) =
             let state = new ConcurrentDictionary<int, int ref>()
             fun partition -> state.GetOrAdd(partition, fun _ -> ref 0)
 
+        let concurrentCalls = ref 0
+        let  foundNonMonotonic = ref false
+
         do! runConsumers log config 1 None
                 (fun c m -> Async.Catch <| async {
                     let partition = let p = m.raw.Partition in p.Value
@@ -303,12 +308,12 @@ type T3(testOutputHelper) =
                     // check per-partition handlers are serialized
                     let concurrentBatchCell = getBatchPartitionCount partition
                     let concurrentBatches = Interlocked.Increment concurrentBatchCell
-                    test <@ 1 = concurrentBatches @> // "partitions should never schedule more than one batch concurrently")
+                    if 1 <> concurrentBatches then Interlocked.Increment(concurrentCalls) |> ignore
 
                     // check for message monotonicity
                     let offset = getPartitionOffset partition
                     for msg in [|m|] do
-                        Assert.True((let o = msg.raw.Offset in o.Value) > !offset, "offset for partition should be monotonic")
+                        if (let o = msg.raw.Offset in o.Value) > !offset then foundNonMonotonic := true
                         offset := let o = msg.raw.Offset in o.Value
 
                     do! Async.Sleep 100
@@ -317,5 +322,7 @@ type T3(testOutputHelper) =
 
                     if Interlocked.Increment(globalMessageCount) >= numMessages then c.Stop() })
 
+        test <@ !foundNonMonotonic @> //  "offset for partition should be monotonic"
+        test <@ !concurrentCalls > 1 @> // "partitions should definitely schedule more than one batch concurrently")
         test <@ numMessages = !globalMessageCount @>
     }

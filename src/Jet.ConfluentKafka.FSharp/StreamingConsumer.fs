@@ -100,11 +100,13 @@ module Scheduling =
             let x = { elapsedMs = 0L; remaining = batch.messages.Length; faults = ConcurrentStack(); batch = batch }
             let mkDispatcher item = async {
                 let sw = Stopwatch.StartNew()
-                let! res = handle item
-                let elapsed = sw.Elapsed
-                match res with
-                | Choice1Of2 () -> x.RecordOk elapsed
-                | Choice2Of2 exn -> x.RecordExn(elapsed,exn) }
+                // This exception guard _should_ technically not be necessary per the interface contract, but we trust clients to be 'creative'
+                try let! res = handle item
+                    let elapsed = sw.Elapsed
+                    match res with
+                    | Choice1Of2 () -> x.RecordOk elapsed
+                    | Choice2Of2 exn -> x.RecordExn(elapsed, exn)
+                with exn -> x.RecordExn(sw.Elapsed, exn) }
             x, Seq.map mkDispatcher batch.messages
     let (|Busy|Completed|Faulted|) = function
         | { remaining = 0; elapsedMs = ms } -> Completed (TimeSpan.FromMilliseconds <| float ms)
@@ -137,7 +139,7 @@ module Scheduling =
             fun () ->
                 cycles <- cycles + 1
                 if due () then dumpStats (); true else false
-        let drainCompleted (cts : CancellationTokenSource, tcs : TaskCompletionSource<unit>) =
+        let drainCompleted abend =
             let mutable more, worked = true, false
             while more do
                 more <- false
@@ -149,8 +151,7 @@ module Scheduling =
                         let effExn = AggregateException(exns).Flatten()
                         // outer layers will react to this by tearing us down
                         // this is no reason not to continue processing other partitions
-                        cts.Cancel()
-                        tcs.TrySetException(effExn) |> ignore
+                        abend effExn
                     | Some (Completed batchProcessingDuration) ->
                         let partitionId, markCompleted, itemCount =
                             let { batch = { partitionIndex = p; onCompletion = f; messages = msgs } } = queue.Dequeue()
@@ -188,10 +189,10 @@ module Scheduling =
                         more <- false 
             worked
 
-        member __.Pump(cts : CancellationTokenSource, tcs : TaskCompletionSource<unit>) = async {
+        member __.Pump abend = async {
             let! ct = Async.CancellationToken
             while not ct.IsCancellationRequested do
-                let hadResults = drainCompleted (cts, tcs)
+                let hadResults = drainCompleted abend
                 let queuedWork = queueWork ()
                 let loggedStats = maybeLogStats ()
                 if not hadResults && not queuedWork && not loggedStats then
@@ -209,7 +210,7 @@ module Submission =
 
     /// Holds the stream of incoming batches, grouping by partition
     /// Manages the submission of batches into the Scheduler in a fair manner
-    type Engine<'M>(log : ILogger, pumpIntervalMs : int, maxSubmitsPerPartition, submit : Scheduling.Batch<'M> -> unit, statsInterval) =
+    type Engine<'M>(log : ILogger, pumpInterval : TimeSpan, maxSubmitsPerPartition, submit : Scheduling.Batch<'M> -> unit, statsInterval) =
         let incoming = new BlockingCollection<Scheduling.Batch<'M>[]>(ConcurrentQueue())
         let buffer = Dictionary<int,PartitionQueue<'M>>()
         let mutable cycles, ingested = 0, 0
@@ -255,7 +256,7 @@ module Submission =
             let! ct = Async.CancellationToken
             while not ct.IsCancellationRequested do
                 let mutable items = Unchecked.defaultof<_>
-                if incoming.TryTake(&items, pumpIntervalMs) then
+                if incoming.TryTake(&items, pumpInterval) then
                     ingest items
                     while incoming.TryTake(&items) do
                         ingest items
@@ -363,55 +364,66 @@ module Ingestion =
 /// Consumption pipeline that attempts to maximize concurrency of `handle` invocations (up to `dop` concurrently).
 /// Consumes according to the `config` supplied to `Start`, until `Stop()` is requested or `handle` yields a fault.
 /// Conclusion of processing can be awaited by via `AwaitCompletion()`.
-type StreamingConsumer private (log : ILogger, inner : IConsumer<string, string>, task : Task<unit>, cts : CancellationTokenSource) =
-
-    /// Builds a processing pipeline per the `config` running up to `dop` instances of `handle` concurrently to maximize global throughput across partitions.
-    /// Processor pumps until `handle` yields a `Choice2Of2` or `Stop()` is requested.
-    static member Start
-        (   log : ILogger, config : KafkaConsumerConfig,
-            mapResult : (ConsumeResult<string,string> -> 'M),
-            handle : ('M -> Async<Choice<unit,exn>>),
-            dop,
-            ?statsInterval, ?logExternalStats) =
-        let statsInterval = defaultArg statsInterval (TimeSpan.FromMinutes 5.)
-
-        let dispatcher = Scheduling.Dispatcher dop
-        let scheduler = Scheduling.Engine<'M>(log, handle, dispatcher.TryAdd, statsInterval, ?logExternalStats=logExternalStats)
-        let limiterLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Core.Constants.messageCounterSourceContext)
-        let limiter = new Ingestion.InFlightMessageCounter(limiterLog, config.buffering.minInFlightBytes, config.buffering.maxInFlightBytes)
-        let consumer = ConsumerBuilder.WithLogging(log, config) // teardown is managed by ingester.Pump()
-        let submitter = Submission.Engine(log, 5, 10, scheduler.Submit, statsInterval)
-        let ingester = Ingestion.Engine<'M>(log, limiter, consumer, mapResult, submitter.Submit, emitInterval = config.buffering.maxBatchDelay, statsInterval = statsInterval)
-        let run (name : string) computation = async {
-            try do! computation
-                log.Information("Exiting {name}", name)
-            with e -> log.Fatal(e, "Abend from {name}", name) }
-        let cts = new CancellationTokenSource()
-        let machine = async {
-            let! ct = Async.CancellationToken
-            use cts = CancellationTokenSource.CreateLinkedTokenSource(ct)
-            let tcs = new TaskCompletionSource<unit>()
-            use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
-            let! _ = Async.StartChild <| run "dispatcher" (dispatcher.Pump())
-            let! _ = Async.StartChild <| run "scheduler" (scheduler.Pump(cts, tcs))
-            let! _ = Async.StartChild <| run "submitter" (submitter.Pump())
-            let! _ = Async.StartChild <| run "ingester" (ingester.Pump())
-            // await for handler faults or external cancellation
-            do! Async.AwaitTaskCorrect tcs.Task
-        }
-        let task = Async.StartAsTask(machine, cancellationToken = cts.Token)
-        new StreamingConsumer(log, consumer, task, cts)
+type StreamingConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
 
     interface IDisposable with member __.Dispose() = __.Stop()
 
+    /// Provides access to the Confluent.Kafka interface directly
     member __.Inner = inner
     /// Inspects current status of processing task
     member __.Status = task.Status
 
     /// Request cancellation of processing
-    member __.Stop() =  
-        log.Information("Consuming ... Stopping {name}", inner.Name)
-        cts.Cancel();  
+    member __.Stop() = triggerStop ()
 
     /// Asynchronously awaits until consumer stops or a `handle` invocation yields a fault
     member __.AwaitCompletion() = Async.AwaitTaskCorrect task
+
+    /// Builds a processing pipeline per the `config` running up to `dop` instances of `handle` concurrently to maximize global throughput across partitions.
+    /// Processor pumps until `handle` yields a `Choice2Of2` or `Stop()` is requested.
+    static member Start
+        (   log : ILogger, config : KafkaConsumerConfig, mapResult : (ConsumeResult<string,string> -> 'M), handle : ('M -> Async<Choice<unit,exn>>),
+            executingMaxDop, ?maxSubmissionsPerPartition, ?pumpInterval, ?statsInterval, ?logExternalStats) =
+        let statsInterval = defaultArg statsInterval (TimeSpan.FromMinutes 5.)
+        let pumpInterval = defaultArg pumpInterval (TimeSpan.FromMilliseconds 5.)
+        let maxSubmissionsPerPartition = defaultArg maxSubmissionsPerPartition 5
+
+        let dispatcher = Scheduling.Dispatcher executingMaxDop
+        let scheduler = Scheduling.Engine<'M>(log, handle, dispatcher.TryAdd, statsInterval, ?logExternalStats=logExternalStats)
+        let limiterLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Core.Constants.messageCounterSourceContext)
+        let limiter = new Ingestion.InFlightMessageCounter(limiterLog, config.buffering.minInFlightBytes, config.buffering.maxInFlightBytes)
+        let consumer = ConsumerBuilder.WithLogging(log, config) // teardown is managed by ingester.Pump()
+        let submitter = Submission.Engine(log, pumpInterval, maxSubmissionsPerPartition, scheduler.Submit, statsInterval)
+        let ingester = Ingestion.Engine<'M>(log, limiter, consumer, mapResult, submitter.Submit, emitInterval = config.buffering.maxBatchDelay, statsInterval = statsInterval)
+        let cts = new CancellationTokenSource()
+        let ct = cts.Token
+        let tcs = new TaskCompletionSource<unit>()
+        // external cancellation should yield a success result
+        use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
+        let start name f =
+            let wrap (name : string) computation = async {
+                try do! computation
+                    log.Information("Exiting {name}", name)
+                with e -> log.Fatal(e, "Abend from {name}", name) }
+            Async.Start(wrap name f, ct)
+        // if scheduler encounters a faulted handler, we propagate that as the consumer's Result
+        let abend (exns : AggregateException) =
+            if tcs.TrySetException(exns) then log.Warning(exns, "Cancelling processing due to {count} faulted handlers", exns.InnerExceptions.Count)
+            else log.Information("Failed setting {count} exceptions", exns.InnerExceptions.Count)
+            // NB cancel needs to be after TSE or the Register(TSE) will win
+            cts.Cancel()
+
+        let machine = async {
+            start "dispatcher" <| dispatcher.Pump()
+            start "scheduler" <| scheduler.Pump abend
+            start "submitter" <| submitter.Pump()
+            start "ingester" <| ingester.Pump()
+
+            // await for either handler-driven abend or external cancellation via Stop()
+            do! Async.AwaitTaskCorrect tcs.Task
+        }
+        let task = Async.StartAsTask machine
+        let triggerStop () =
+            log.Information("Consuming ... Stopping {name}", consumer.Name)
+            cts.Cancel();  
+        new StreamingConsumer(consumer, task, triggerStop)
