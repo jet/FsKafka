@@ -1,4 +1,4 @@
-﻿namespace Jet.ConfluentKafka.FSharp.Integration.Streaming
+﻿namespace Jet.ConfluentKafka.FSharp.Integration.Parallel
 
 open Jet.ConfluentKafka.FSharp
 open Newtonsoft.Json
@@ -54,14 +54,14 @@ module Helpers =
                 |> Async.Parallel
         }
 
-    type StreamingConsumer with
+    type ParallelConsumer with
         member c.StopAfter(delay : TimeSpan) =
             Task.Delay(delay).ContinueWith(fun (_:Task) -> c.Stop()) |> ignore
 
     type TestMessage = { producerId : int ; messageId : int }
     [<NoComparison; NoEquality>]
     type ConsumedTestMessage = { consumerId : int ; raw : ConsumeResult<string,string> ; payload : TestMessage }
-    type ConsumerCallback = StreamingConsumer -> ConsumedTestMessage -> Async<Choice<unit,exn>>
+    type ConsumerCallback = ParallelConsumer -> ConsumedTestMessage -> Async<unit>
 
     let runProducers log (broker : Uri) (topic : string) (numProducers : int) (messagesPerProducer : int) = async {
         let runProducer (producerId : int) = async {
@@ -99,7 +99,7 @@ module Helpers =
                 | Some c -> c
 
             let handle item = handler (getConsumer()) (deserialize item)
-            let consumer = StreamingConsumer.Start(log, config, id, handle, executingMaxDop = 1024, statsInterval = TimeSpan.FromSeconds 10.)
+            let consumer = ParallelConsumer.Start(log, config, 1024, id, handle >> Async.Catch, statsInterval = TimeSpan.FromSeconds 10.)
 
             consumerCell := Some consumer
 
@@ -127,7 +127,7 @@ type T1(testOutputHelper) =
         let groupId = newId()
     
         let consumedBatches = new ConcurrentBag<ConsumedTestMessage>()
-        let consumerCallback (consumer:StreamingConsumer) msg = Async.Catch <| async {
+        let consumerCallback (consumer:ParallelConsumer) msg = async {
             do consumedBatches.Add msg
             let messageCount = consumedBatches |> Seq.length
             // signal cancellation if consumed items reaches expected size
@@ -181,7 +181,7 @@ type T2(testOutputHelper) =
 
         let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId)
         
-        let! r = Async.Catch <| runConsumers log config 1 None (fun _ _ -> Async.Catch <| async { return raise <|IndexOutOfRangeException() })
+        let! r = Async.Catch <| runConsumers log config 1 None (fun _ _ -> async { return raise <|IndexOutOfRangeException() })
         test <@ match r with
                 | Choice2Of2 (:? IndexOutOfRangeException) -> true
                 | Choice2Of2 (:? AggregateException as ae) -> ae.InnerExceptions |> Seq.forall (function (:? IndexOutOfRangeException) -> true | _ -> false)
@@ -199,7 +199,7 @@ type T2(testOutputHelper) =
         let groupId1 = newId()
         let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId1)
         do! runConsumers log config 1 None 
-                (fun c _m -> Async.Catch <| async { if Interlocked.Increment(messageCount) >= numMessages then c.Stop() })
+                (fun c _m -> async { if Interlocked.Increment(messageCount) >= numMessages then c.Stop() })
 
         test <@ numMessages = !messageCount @>
 
@@ -207,7 +207,7 @@ type T2(testOutputHelper) =
         let groupId2 = newId()
         let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId2)
         do! runConsumers log config 1 None
-                (fun c _m -> Async.Catch <| async { if Interlocked.Increment(messageCount) >= numMessages then c.Stop() })
+                (fun c _m -> async { if Interlocked.Increment(messageCount) >= numMessages then c.Stop() })
 
         test <@ numMessages = !messageCount @>
     }
@@ -223,7 +223,7 @@ type T2(testOutputHelper) =
         // expected to read 10 messages from the first consumer
         let messageCount = ref 0
         do! runConsumers log config 1 None
-                (fun c _m -> Async.Catch <| async {
+                (fun c _m -> async {
                     if Interlocked.Increment(messageCount) >= numMessages then 
                         c.StopAfter(TimeSpan.FromSeconds 1.) }) // cancel after 1 second to allow offsets to be stored
 
@@ -235,7 +235,7 @@ type T2(testOutputHelper) =
         // expected to read no messages from the subsequent consumer
         let messageCount = ref 0
         do! runConsumers log config 1 (Some (TimeSpan.FromSeconds 10.)) 
-                (fun c _m -> Async.Catch <| async { 
+                (fun c _m -> async { 
                     if Interlocked.Increment(messageCount) >= numMessages then c.Stop() })
 
         test <@ 0 = !messageCount @>
@@ -256,7 +256,7 @@ type T3(testOutputHelper) =
         // expected to read 10 messages from the first consumer
         let messageCount = ref 0
         do! runConsumers log config 1 None
-                (fun c _m -> Async.Catch <| async {
+                (fun c _m -> async {
                     if Interlocked.Increment(messageCount) >= numMessages then 
                         c.StopAfter(TimeSpan.FromSeconds 1.) }) // cancel after 1 second to allow offsets to be committed)
 
@@ -268,7 +268,7 @@ type T3(testOutputHelper) =
         // this is to verify there are no off-by-one errors in how offsets are committed
         let messageCount = ref 0
         do! runConsumers log config 1 None
-                (fun c _m -> Async.Catch <| async {
+                (fun c _m -> async {
                     if Interlocked.Increment(messageCount) >= numMessages then 
                         c.StopAfter(TimeSpan.FromSeconds 1.) }) // cancel after 1 second to allow offsets to be committed)
 
@@ -302,7 +302,7 @@ type T3(testOutputHelper) =
         let  foundNonMonotonic = ref false
 
         do! runConsumers log config 1 None
-                (fun c m -> Async.Catch <| async {
+                (fun c m -> async {
                     let partition = let p = m.raw.Partition in p.Value
 
                     // check per-partition handlers are serialized
