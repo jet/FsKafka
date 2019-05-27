@@ -15,7 +15,7 @@ module private Helpers =
     /// Gathers stats relating to how many items of a given partition have been observed
     type PartitionStats() =
         let partitions = Dictionary<int,int64>()
-        member __.Ingest(partitionId, ?weight) = 
+        member __.Record(partitionId, ?weight) = 
             let weight = defaultArg weight 1L
             match partitions.TryGetValue partitionId with
             | true, catCount -> partitions.[partitionId] <- catCount + weight
@@ -53,6 +53,7 @@ module private Helpers =
     /// Can't figure out a cleaner way to shim it :(
     let tryPeek (x : Queue<_>) = if x.Count = 0 then None else Some (x.Peek())
 
+/// Deals with dispatch and result handling, triggering completion callbacks as batches reach completed state
 module Scheduling =
 
     /// Single instance per system; coordinates the dispatching of work, subject to the maxDop concurrent processors constraint
@@ -146,6 +147,7 @@ module Scheduling =
             fun () ->
                 cycles <- cycles + 1
                 if due () then dumpStats (); true else false
+        /// Inspects the oldest in-flight batch per partition to determine if it's reached a terminal state; if it has, remove and trigger completion callback
         let drainCompleted abend =
             let mutable more, worked = true, false
             while more do
@@ -154,35 +156,34 @@ module Scheduling =
                     match tryPeek queue with
                     | None // empty
                     | Some Busy -> () // still working
-                    | Some (Faulted exns) ->
-                        let effExn = AggregateException(exns).Flatten()
-                        // outer layers will react to this by tearing us down
-                        // this is no reason not to continue processing other partitions
-                        abend effExn
-                    | Some (Completed batchProcessingDuration) ->
+                    | Some (Faulted exns) -> // outer layers will react to this by tearing us down
+                        abend (AggregateException(exns))
+                    | Some (Completed batchProcessingDuration) -> // call completion function asap
                         let partitionId, markCompleted, itemCount =
                             let { batch = { partitionId = p; onCompletion = f; messages = msgs } } = queue.Dequeue()
                             p, f, msgs.LongLength
-                        completedBatches.Ingest partitionId
-                        completedItems.Ingest(partitionId, itemCount)
+                        completedBatches.Record partitionId
+                        completedItems.Record(partitionId, itemCount)
                         processingDuration <- processingDuration.Add batchProcessingDuration
                         markCompleted ()
                         worked <- true
                         more <- true // vote for another iteration as the next one could already be complete too. Not looping inline/immediately to give others partitions equal credit
             worked
+        /// Unpacks a new batch from the queue; each item goes through the `waiting` queue as the loop will continue to next iteration if dispatcher is full
         let tryPrepareNext () =
             match incoming.TryDequeue() with
             | false, _ -> false
             | true, ({ partitionId = pid; messages = msgs} as batch) ->
-                startedBatches.Ingest(pid)
-                startedItems.Ingest(pid, msgs.LongLength)
+                startedBatches.Record(pid)
+                startedItems.Record(pid, msgs.LongLength)
                 let wipBatch, runners = WipBatch.Create(batch, handle)
                 runners |> Seq.iter waiting.Enqueue
                 match active.TryGetValue pid with
                 | false, _ -> let q = Queue(1024) in active.[pid] <- q; q.Enqueue wipBatch
                 | true, q -> q.Enqueue wipBatch
                 true
-        let queueWork () =
+        /// Tops up the current work in progress
+        let reprovisionDispatcher () =
             let mutable more, worked = true, false
             while more do
                 match tryPeek waiting with
@@ -196,17 +197,21 @@ module Scheduling =
                         more <- false 
             worked
 
+        /// Main pumping loop; `abend` is a callback triggered by a faulted task which the outer controler can use to shut down the processing
         member __.Pump abend = async {
             let! ct = Async.CancellationToken
             while not ct.IsCancellationRequested do
                 let hadResults = drainCompleted abend
-                let queuedWork = queueWork ()
+                let queuedWork = reprovisionDispatcher ()
                 let loggedStats = maybeLogStats ()
                 if not hadResults && not queuedWork && not loggedStats then
                     Thread.Sleep 1 } // not Async.Sleep, we like this context and/or cache state if nobody else needs it
+
+        /// Feeds a batch of work into the queue; the caller is expected to ensure sumbissions are timely to avoid starvation, but throttled to ensure fair ordering
         member __.Submit(batches : Batch<'M>) =
             incoming.Enqueue batches
 
+/// Holds batches from the Ingestion pipe, feeding them continuously to the scheduler in an appropriate order
 module Submission =
 
     /// Holds the queue for a given partition, together with a semaphore we use to ensure the number of in-flight batches per partition is constrained
@@ -248,8 +253,8 @@ module Submission =
                                 batch.onCompletion()
                                 pq.submissions.Release() |> ignore
                             submit { batch with onCompletion = onCompletion' }
-                            submittedBatches.Ingest(batch.partitionId)
-                            submittedMessages.Ingest(batch.partitionId,batch.messages.LongLength)
+                            submittedBatches.Record(batch.partitionId)
+                            submittedMessages.Record(batch.partitionId,batch.messages.LongLength)
                 more <- worked
         /// Take one timeslice worh of ingestion and add to relevant partition queues
         /// When ingested, we allow one propagation submission per partition
@@ -259,6 +264,8 @@ module Submission =
                 | false, _ -> buffer.[x.partitionId] <- PartitionQueue<'M>.Create(maxSubmitsPerPartition,x)
                 | true, pq -> pq.Append(x)
             propagate()
+
+        /// Processing loop, continuously splitting `Submit`ted items into per-partition queues and ensuring enough items are provided to the Scheduler
         member __.Pump() = async {
             let! ct = Async.CancellationToken
             while not ct.IsCancellationRequested do
@@ -268,12 +275,17 @@ module Submission =
                     while incoming.TryTake(&items) do
                         ingest items
                 maybeLogStats () }
+
+        /// Supplies an incoming Batch for holding and forwarding to scheduler at the right time
         member __.Submit(items : Scheduling.Batch<'M>[]) =
             Interlocked.Increment(&ingested) |> ignore
             incoming.Add items
 
+/// Manages efficiently and continuously reading from the Confluent.Kafka consumer, offloading the pushing of those batches onward to the Submitter
+/// Responsible for ensuring we over-read, which would cause the rdkafka buffers to overload the system in terms of memory usage
 module Ingestion =
 
+    /// Accounts for the number/weight of messages currrently in the system so rdkafka reading doesn't get too far ahead
     type InFlightMessageCounter(log: ILogger, minInFlightBytes : int64, maxInFlightBytes : int64) =
         do  if minInFlightBytes < 1L then invalidArg "minInFlightBytes" "must be positive value"
             if maxInFlightBytes < 1L then invalidArg "maxInFlightBytes" "must be positive value"
@@ -304,12 +316,11 @@ module Ingestion =
             x.Append(sz, message, mapMessage)
             x
 
-    /// Continuously polls across the assigned partitions, building spans; periodically, `submit`s accummulated messages as checkointable Batches
-    /// Pauses if in-flight threshold is breached
+    /// Continuously polls across the assigned partitions, building spans; periodically (at intervals of `emitInterval`), `submit`s accummulated messages as
+    ///   checkpointable Batches
+    /// Pauses if in-flight upper threshold is breached until such time as it drops below that the lower limit
     type IngestionEngine<'M>
-        (   log : ILogger, counter : InFlightMessageCounter, consumer : IConsumer<_,_>,
-            mapMessage : ConsumeResult<_,_> -> 'M,
-            emit : Scheduling.Batch<'M>[] -> unit,
+        (   log : ILogger, counter : InFlightMessageCounter, consumer : IConsumer<_,_>, mapMessage : ConsumeResult<_,_> -> 'M, emit : Scheduling.Batch<'M>[] -> unit,
             emitInterval, statsInterval) =
         let acc = Dictionary()
         let remainingIngestionWindow = intervalTimer emitInterval
@@ -346,7 +357,7 @@ module Ingestion =
                 emit <| tmp.ToArray()
         member __.Pump() = async {
             let! ct = Async.CancellationToken
-            use _ = consumer // we'll dispose it at the end
+            use _ = consumer // Dispose it at the end (NB but one has to Close first or risk AccessViolations etc)
             try while not ct.IsCancellationRequested do
                     match counter.IsOverLimitNow(), remainingIngestionWindow () with
                     | true, _ ->
@@ -362,7 +373,6 @@ module Ingestion =
                             | message -> ingest message
                         with| :? System.OperationCanceledException -> log.Warning("Consuming... cancelled")
                             | :? ConsumeException as e -> log.Warning(e, "Consuming... exception")
-                            
             finally
                 submit () // We don't want to leak our reservations against the counter and want to pass of messages we ingested
                 dumpStats () // Unconditional logging when completing
@@ -422,6 +432,7 @@ type ParallelConsumer private (inner : IConsumer<string, string>, task : Task<un
             // external cancellation should yield a success result
             use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
             start "dispatcher" <| dispatcher.Pump()
+            // ... fault results from dispatched tasks result in the `machine` concluding with an exception
             start "scheduler" <| scheduler.Pump abend
             start "submitter" <| submitter.Pump()
             start "ingester" <| ingester.Pump()

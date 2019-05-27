@@ -183,7 +183,6 @@ type T2(testOutputHelper) =
         
         let! r = Async.Catch <| runConsumers log config 1 None (fun _ _ -> async { return raise <|IndexOutOfRangeException() })
         test <@ match r with
-                | Choice2Of2 (:? IndexOutOfRangeException) -> true
                 | Choice2Of2 (:? AggregateException as ae) -> ae.InnerExceptions |> Seq.forall (function (:? IndexOutOfRangeException) -> true | _ -> false)
                 | x -> failwithf "%A" x @>
     }
