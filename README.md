@@ -12,7 +12,7 @@ See [the Equinox QuickStart](https://github.com/jet/equinox#quickstart) for exam
 
 The components within this repository are delivered as a multi-targeted Nuget package targeting `net461` (F# 3.1+) and `netstandard2.0` (F# 4.5+) profiles
 
-- [![NuGet](https://img.shields.io/nuget/vpre/Jet.ConfluentKafka.FSharp.svg)](https://www.nuget.org/packages/Jet.ConfluentKafka.FSharp/) `Jet.ConfluentKafka.FSharp`: Wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations, with basic logging instrumentation.
+- [![NuGet](https://img.shields.io/nuget/vpre/Jet.ConfluentKafka.FSharp.svg)](https://www.nuget.org/packages/Jet.ConfluentKafka.FSharp/) `Jet.ConfluentKafka.FSharp`: Wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. Alternately, the `ParallelConsumer` provides deeper logging and higher throughput for scenarios where consuming in batches is not a useful paradigm.
   [Depends](https://www.fuget.org/packages/Jet.ConfluentKafka.FSharp) on `Confluent.Kafka [1.0.0]`, `librdkafka [1.0.0]` (pinned to ensure we use a tested pairing enterprise wide), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
 
 ## CONTRIBUTING
@@ -55,7 +55,7 @@ dotnet build build.proj -v n
 
 - The `BatchedConsumer` implementation tries to give clear feedback as to when reading is not keeping up, for diagnostic purposes. As of [#32](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/32), such messages are tagged with the type `Jet.ConfluentKafka.FSharp.InFlightMessageCounter`, and as such can be silenced by including the following in one's `LoggerConfiguration()`: 
 
-    `.MinimumLevel.Override(Jet.ConfluentKafka.FSharp.Constants.messageCounterSourceContext, Serilog.Events.LogEventLevel.Warning)`
+    `.MinimumLevel.Override(Jet.ConfluentKafka.FSharp.Core.Constants.messageCounterSourceContext, Serilog.Events.LogEventLevel.Warning)`
 
 ### What is this, why does it exist, where did it come from, is anyone using it ?
 
