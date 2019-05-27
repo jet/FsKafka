@@ -147,7 +147,8 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
             /// 1) items within the initial 'batch' can get written out of order in the face of timeouts and/or retries
             /// 2) items beyond the linger period may enter a separate batch, which can potentially get scheduled for transmission out of order
             ?maxInFlight,
-            // This is used successfully in production with a 10ms linger value; having it in place is critical to items getting into the correct groupings. Default: 100ms
+            /// Having a non-zero linger is critical to items getting into the correct groupings
+            /// (even if it of itself does not guarantee anything based on Kafka's guarantees). Default: 100ms
             ?linger: TimeSpan) : BatchedProducer =
         let lingerMs = match linger with Some x -> int x.TotalMilliseconds | None -> 100
         log.Information("Producing... Using batch Mode with linger={lingerMs}", lingerMs)
