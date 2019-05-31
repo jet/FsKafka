@@ -285,22 +285,6 @@ module Submission =
 /// Responsible for ensuring we over-read, which would cause the rdkafka buffers to overload the system in terms of memory usage
 module Ingestion =
 
-    /// Accounts for the number/weight of messages currrently in the system so rdkafka reading doesn't get too far ahead
-    type InFlightMessageCounter(log: ILogger, minInFlightBytes : int64, maxInFlightBytes : int64) =
-        do  if minInFlightBytes < 1L then invalidArg "minInFlightBytes" "must be positive value"
-            if maxInFlightBytes < 1L then invalidArg "maxInFlightBytes" "must be positive value"
-            if minInFlightBytes > maxInFlightBytes then invalidArg "maxInFlightBytes" "must be greater than minInFlightBytes"
-
-        let mutable inFlightBytes = 0L
-        member __.InFlightMb = float inFlightBytes / 1024. / 1024.
-        member __.Delta(numBytes : int64) = Interlocked.Add(&inFlightBytes, numBytes) |> ignore
-        member __.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
-        member __.AwaitThreshold() =
-            log.Warning("Consumer reached in-flight message threshold, breaking off polling, bytes={max}", inFlightBytes)
-            while __.IsOverLimitNow() do
-                Thread.Sleep 2
-            log.Information "Consumer resuming polling"
-
     /// Retains the messages we've accumulated for a given Partition
     [<NoComparison>]
     type PartitionSpan<'M> =
@@ -320,7 +304,7 @@ module Ingestion =
     ///   checkpointable Batches
     /// Pauses if in-flight upper threshold is breached until such time as it drops below that the lower limit
     type IngestionEngine<'M>
-        (   log : ILogger, counter : InFlightMessageCounter, consumer : IConsumer<_,_>, mapMessage : ConsumeResult<_,_> -> 'M, emit : Scheduling.Batch<'M>[] -> unit,
+        (   log : ILogger, counter : Core.InFlightMessageCounter, consumer : IConsumer<_,_>, mapMessage : ConsumeResult<_,_> -> 'M, emit : Scheduling.Batch<'M>[] -> unit,
             emitInterval, statsInterval) =
         let acc = Dictionary()
         let remainingIngestionWindow = intervalTimer emitInterval
@@ -363,7 +347,7 @@ module Ingestion =
                     | true, _ ->
                         submit()
                         maybeLogStats()
-                        counter.AwaitThreshold()
+                        counter.AwaitThreshold(fun  () -> Thread.Sleep 2)
                     | false, None ->
                         submit()
                         maybeLogStats()
@@ -408,7 +392,7 @@ type ParallelConsumer private (inner : IConsumer<string, string>, task : Task<un
         let dispatcher = Scheduling.Dispatcher maxDop
         let scheduler = Scheduling.SchedulingEngine<'M>(log, handle, dispatcher.TryAdd, statsInterval, ?logExternalStats=logExternalStats)
         let limiterLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Core.Constants.messageCounterSourceContext)
-        let limiter = new Ingestion.InFlightMessageCounter(limiterLog, config.buffering.minInFlightBytes, config.buffering.maxInFlightBytes)
+        let limiter = new Core.InFlightMessageCounter(limiterLog, config.buffering.minInFlightBytes, config.buffering.maxInFlightBytes)
         let consumer = ConsumerBuilder.WithLogging(log, config) // teardown is managed by ingester.Pump()
         let submitter = Submission.SubmissionEngine(log, pumpInterval, maxSubmissionsPerPartition, scheduler.Submit, statsInterval)
         let ingester = Ingestion.IngestionEngine<'M>(log, limiter, consumer, mapResult, submitter.Submit, emitInterval = config.buffering.maxBatchDelay, statsInterval = statsInterval)
