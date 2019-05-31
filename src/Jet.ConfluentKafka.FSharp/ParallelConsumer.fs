@@ -21,11 +21,7 @@ module private Helpers =
             | true, catCount -> partitions.[partitionId] <- catCount + weight
             | false, _ -> partitions.[partitionId] <- weight
         member __.Clear() = partitions.Clear()
-    #if NET461
-        member __.StatsDescending = partitions |> Seq.map (|KeyValue|) |> Seq.sortBy (fun (_,s) -> -s)
-    #else
-        member __.StatsDescending = partitions |> Seq.map (|KeyValue|) |> Seq.sortByDescending snd
-    #endif
+        member __.StatsDescending = partitions |> Seq.sortBy (fun x -> -x.Value) |> Seq.map (|KeyValue|)
 
     /// Maintains a Stopwatch such that invoking will yield true at intervals defined by `period`
     let intervalCheck (period : TimeSpan) =
@@ -45,16 +41,15 @@ module private Helpers =
             | remainder when remainder.Ticks > 0L -> Some remainder
             | _ -> timer.Restart(); None
 
-    /// guesstimate approximate message size in bytes
-    let approximateMessageBytes (message : ConsumeResult<string, string>) =
-        let inline len (x:string) = match x with null -> 0 | x -> sizeof<char> * x.Length
-        16 + len message.Key + len message.Value |> int64
-
     /// Can't figure out a cleaner way to shim it :(
     let tryPeek (x : Queue<_>) = if x.Count = 0 then None else Some (x.Peek())
 
+/// Batch of work as passed from the Submitter to the Scheduler comprising messages with their associated checkpointing/completion callback
+[<NoComparison; NoEquality>]
+type SubmissionBatch<'M> = { partitionId : int; onCompletion: unit -> unit; messages: 'M [] }
+
 /// Deals with dispatch and result handling, triggering completion callbacks as batches reach completed state
-module Scheduling =
+module ParallelScheduling =
 
     /// Single instance per system; coordinates the dispatching of work, subject to the maxDop concurrent processors constraint
     /// Semaphore is allocated on queueing, deallocated on completion of the processing
@@ -117,7 +112,7 @@ module Scheduling =
     /// - replenishing the Dispatcher 
     /// - determining when WipBatches attain terminal state in order to triggering completion callbacks at the earliest possible opportunity
     /// - triggering abend of the processing should any dispatched tasks start to fault
-    type SchedulingEngine<'M>(log : ILogger, handle, tryDispatch : (Async<unit>) -> bool, statsInterval, ?logExternalStats) =
+    type PartitionedSchedulingEngine<'M>(log : ILogger, handle, tryDispatch : (Async<unit>) -> bool, statsInterval, ?logExternalStats) =
         // Submitters dictate batch commencement order by supply batches in a fair order; should never be empty if there is work in the system
         let incoming = ConcurrentQueue<Batch<'M>>()
         // Prepared work items ready to feed to Dispatcher (only created on demand in order to ensure we maximize overall progress and fairness)
@@ -213,25 +208,27 @@ module Scheduling =
 
 /// Holds batches from the Ingestion pipe, feeding them continuously to the scheduler in an appropriate order
 module Submission =
-
     /// Holds the queue for a given partition, together with a semaphore we use to ensure the number of in-flight batches per partition is constrained
     [<NoComparison>]
-    type PartitionQueue<'M> = { submissions: SemaphoreSlim; queue : Queue<Scheduling.Batch<'M>> } with
+    type PartitionQueue<'B> = { submissions: SemaphoreSlim; queue : Queue<'B> } with
         member __.Append(batch) = __.queue.Enqueue batch
-        static member Create(maxSubmits, batch) = let t = { submissions = new SemaphoreSlim(maxSubmits); queue = Queue(maxSubmits * 2) } in t.Append(batch); t 
+        static member Create(maxSubmits) = { submissions = new SemaphoreSlim(maxSubmits); queue = Queue(maxSubmits * 2) } 
 
     /// Holds the stream of incoming batches, grouping by partition
     /// Manages the submission of batches into the Scheduler in a fair manner
-    type SubmissionEngine<'M>(log : ILogger, pumpInterval : TimeSpan, maxSubmitsPerPartition, submit : Scheduling.Batch<'M> -> unit, statsInterval) =
-        let incoming = new BlockingCollection<Scheduling.Batch<'M>[]>(ConcurrentQueue())
-        let buffer = Dictionary<int,PartitionQueue<'M>>()
-        let mutable cycles, ingested = 0, 0
+    type SubmissionEngine<'M,'B>
+        (   log : ILogger, maxSubmitsPerPartition, mapBatch: (unit -> unit) -> SubmissionBatch<'M> -> 'B, submitBatch : 'B -> int, statsInterval, ?pumpInterval : TimeSpan,
+            ?tryCompactQueue) =
+        let pumpInterval = defaultArg pumpInterval (TimeSpan.FromMilliseconds 5.)
+        let incoming = new BlockingCollection<SubmissionBatch<'M>[]>(ConcurrentQueue())
+        let buffer = Dictionary<int,PartitionQueue<'B>>()
+        let mutable cycles, ingested, compacted = 0, 0, 0
         let submittedBatches,submittedMessages = PartitionStats(), PartitionStats()
         let dumpStats () =
             let waiting = seq { for x in buffer do if x.Value.queue.Count <> 0 then yield x.Key, x.Value.queue.Count } |> Seq.sortBy (fun (_,snd) -> -snd)
-            log.Information("Submitter {cycles} cycles Ingested {ingested} Waiting {@waiting} Batches {@batches} Messages {@messages}",
-                cycles, ingested, waiting, submittedBatches.StatsDescending, submittedMessages.StatsDescending)
-            ingested <- 0; cycles <- 0; submittedBatches.Clear(); submittedMessages.Clear()
+            log.Information("Submitter {cycles} cycles {ingested} accepted {compactions} compactions Holding {@waiting}", cycles, ingested, compacted, waiting)
+            log.Information(" Submitted Batches {@batches} Messages {@messages}", submittedBatches.StatsDescending, submittedMessages.StatsDescending)
+            ingested <- 0; compacted <- 0; cycles <- 0; submittedBatches.Clear(); submittedMessages.Clear()
         let maybeLogStats =
             let due = intervalCheck statsInterval
             fun () ->
@@ -241,49 +238,65 @@ module Submission =
         // - each partition has a controlled maximum number of entrants in the scheduler queue
         // - a fair ordering of batch submissions
         let propagate () =
-            let mutable more = true
+            let mutable more, worked = true, false
             while more do
-                let mutable worked = false
-                for KeyValue(_,pq) in buffer do
+                more <- false
+                for KeyValue(pi,pq) in buffer do
                     if pq.queue.Count <> 0 then
                         if pq.submissions.Wait(0) then
                             worked <- true
-                            let batch = pq.queue.Dequeue()
-                            let onCompletion' () =
-                                batch.onCompletion()
-                                pq.submissions.Release() |> ignore
-                            submit { batch with onCompletion = onCompletion' }
-                            submittedBatches.Record(batch.partitionId)
-                            submittedMessages.Record(batch.partitionId,batch.messages.LongLength)
-                more <- worked
-        /// Take one timeslice worh of ingestion and add to relevant partition queues
+                            more <- true
+                            let count = submitBatch <| pq.queue.Dequeue()
+                            submittedBatches.Record(pi)
+                            submittedMessages.Record(pi, int64 count)
+            worked
+        /// Take one timeslice worth of ingestion and add to relevant partition queues
         /// When ingested, we allow one propagation submission per partition
-        let ingest (partitionBatches : Scheduling.Batch<'M>[]) =
-            for x in partitionBatches do
-                match buffer.TryGetValue x.partitionId with
-                | false, _ -> buffer.[x.partitionId] <- PartitionQueue<'M>.Create(maxSubmitsPerPartition,x)
-                | true, pq -> pq.Append(x)
+        let ingest (partitionBatches : SubmissionBatch<'M>[]) =
+            for { partitionId = pid } as batch in partitionBatches do
+                let pq =
+                    match buffer.TryGetValue pid with
+                    | false, _ -> let t = PartitionQueue<_>.Create(maxSubmitsPerPartition) in buffer.[pid] <- t; t
+                    | true, pq -> pq
+                let mapped = mapBatch (fun () -> pq.submissions.Release() |> ignore) batch
+                pq.Append(mapped)
             propagate()
+        /// We use timeslices where we're we've fully provisioned the scheduler to index any waiting Batches
+        let compact f =
+            let mutable worked = false
+            for KeyValue(_,pq) in buffer do
+                if f pq.queue then
+                    worked <- true
+            if worked then compacted <- compacted + 1; true
+            else false
 
         /// Processing loop, continuously splitting `Submit`ted items into per-partition queues and ensuring enough items are provided to the Scheduler
         member __.Pump() = async {
             let! ct = Async.CancellationToken
             while not ct.IsCancellationRequested do
                 let mutable items = Unchecked.defaultof<_>
+                let mutable propagated = false
                 if incoming.TryTake(&items, pumpInterval) then
-                    ingest items
+                    propagated <- ingest items
                     while incoming.TryTake(&items) do
-                        ingest items
+                        if ingest items then propagated <- true
+                else propagated <- propagate()
+                match propagated, tryCompactQueue with
+                | false, None -> Thread.Sleep 2
+                | false, Some f when not (compact f) -> Thread.Sleep 2
+                | _ -> ()
+
                 maybeLogStats () }
 
-        /// Supplies an incoming Batch for holding and forwarding to scheduler at the right time
-        member __.Submit(items : Scheduling.Batch<'M>[]) =
+        /// Supplies a set of Batches for holding and forwarding to scheduler at the right time
+        member __.Ingest(items : SubmissionBatch<'M>[]) =
             Interlocked.Increment(&ingested) |> ignore
             incoming.Add items
 
 /// Manages efficiently and continuously reading from the Confluent.Kafka consumer, offloading the pushing of those batches onward to the Submitter
 /// Responsible for ensuring we over-read, which would cause the rdkafka buffers to overload the system in terms of memory usage
-module Ingestion =
+[<AutoOpen>]
+module KafkaIngestion =
 
     /// Retains the messages we've accumulated for a given Partition
     [<NoComparison>]
@@ -300,18 +313,23 @@ module Ingestion =
             x.Append(sz, message, mapMessage)
             x
 
+    /// guesstimate approximate message size in bytes
+    let approximateMessageBytes (message : ConsumeResult<string, string>) =
+        let inline len (x:string) = match x with null -> 0 | x -> sizeof<char> * x.Length
+        16 + len message.Key + len message.Value |> int64
+
     /// Continuously polls across the assigned partitions, building spans; periodically (at intervals of `emitInterval`), `submit`s accummulated messages as
     ///   checkpointable Batches
     /// Pauses if in-flight upper threshold is breached until such time as it drops below that the lower limit
-    type IngestionEngine<'M>
-        (   log : ILogger, counter : Core.InFlightMessageCounter, consumer : IConsumer<_,_>, mapMessage : ConsumeResult<_,_> -> 'M, emit : Scheduling.Batch<'M>[] -> unit,
+    type KafkaIngestionEngine<'M>
+        (   log : ILogger, counter : Core.InFlightMessageCounter, consumer : IConsumer<_,_>, mapMessage : ConsumeResult<_,_> -> 'M, emit : SubmissionBatch<'M>[] -> unit,
             emitInterval, statsInterval) =
         let acc = Dictionary()
         let remainingIngestionWindow = intervalTimer emitInterval
         let mutable intervalMsgs, intervalChars, totalMessages, totalChars = 0L, 0L, 0L, 0L
         let dumpStats () =
             totalMessages <- totalMessages + intervalMsgs; totalChars <- totalChars + intervalChars
-            log.Information("Ingested {msgs:n0} messages, {chars:n0} chars In-flight ~{inflightMb:n1}MB Total {totalMessages:n0} messages {totalChars:n0} chars",
+            log.Information("Ingested {msgs:n0}m, {chars:n0}c In-flight ~{inflightMb:n1}MB Σ {totalMessages:n0} messages, {totalChars:n0} chars",
                 intervalMsgs, intervalChars, counter.InFlightMb, totalMessages, totalChars)
             intervalMsgs <- 0L; intervalChars <- 0L
         let maybeLogStats =
@@ -330,7 +348,7 @@ module Ingestion =
             match acc.Count with
             | 0 -> ()
             | partitionsWithMessagesThisInterval ->
-                let tmp = ResizeArray<Scheduling.Batch<'M>>(partitionsWithMessagesThisInterval)
+                let tmp = ResizeArray<SubmissionBatch<'M>>(partitionsWithMessagesThisInterval)
                 for KeyValue(partitionIndex,span) in acc do
                     let checkpoint () =
                         counter.Delta(-span.reservation) // counterbalance Delta(+) per ingest, above
@@ -345,9 +363,11 @@ module Ingestion =
             try while not ct.IsCancellationRequested do
                     match counter.IsOverLimitNow(), remainingIngestionWindow () with
                     | true, _ ->
-                        submit()
-                        maybeLogStats()
-                        counter.AwaitThreshold(fun  () -> Thread.Sleep 2)
+                        let busyWork () =
+                            submit()
+                            maybeLogStats()
+                            Thread.Sleep 1 
+                        counter.AwaitThreshold busyWork
                     | false, None ->
                         submit()
                         maybeLogStats()
@@ -361,11 +381,10 @@ module Ingestion =
                 submit () // We don't want to leak our reservations against the counter and want to pass of messages we ingested
                 dumpStats () // Unconditional logging when completing
                 consumer.Close() (* Orderly Close() before Dispose() is critical *) }
-
 /// Consumption pipeline that attempts to maximize concurrency of `handle` invocations (up to `dop` concurrently).
 /// Consumes according to the `config` supplied to `Start`, until `Stop()` is requested or `handle` yields a fault.
 /// Conclusion of processing can be awaited by via `AwaitCompletion()`.
-type ParallelConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
+type PipelinedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
 
     interface IDisposable with member __.Dispose() = __.Stop()
 
@@ -373,6 +392,8 @@ type ParallelConsumer private (inner : IConsumer<string, string>, task : Task<un
     member __.Inner = inner
     /// Inspects current status of processing task
     member __.Status = task.Status
+    /// After AwaitCompletion, can be used to infer whether exit was clean
+    member __.RanToCompletion = task.Status = TaskStatus.RanToCompletion 
 
     /// Request cancellation of processing
     member __.Stop() = triggerStop ()
@@ -382,28 +403,27 @@ type ParallelConsumer private (inner : IConsumer<string, string>, task : Task<un
 
     /// Builds a processing pipeline per the `config` running up to `dop` instances of `handle` concurrently to maximize global throughput across partitions.
     /// Processor pumps until `handle` yields a `Choice2Of2` or `Stop()` is requested.
-    static member Start<'M>
-        (   log : ILogger, config : KafkaConsumerConfig, maxDop, mapResult : (ConsumeResult<string,string> -> 'M), handle : ('M -> Async<Choice<unit,exn>>),
-            ?maxSubmissionsPerPartition, ?pumpInterval, ?statsInterval, ?logExternalStats) =
-        let statsInterval = defaultArg statsInterval (TimeSpan.FromMinutes 5.)
-        let pumpInterval = defaultArg pumpInterval (TimeSpan.FromMilliseconds 5.)
-        let maxSubmissionsPerPartition = defaultArg maxSubmissionsPerPartition 5
-
-        let dispatcher = Scheduling.Dispatcher maxDop
-        let scheduler = Scheduling.SchedulingEngine<'M>(log, handle, dispatcher.TryAdd, statsInterval, ?logExternalStats=logExternalStats)
+    static member Start(log : ILogger, config : KafkaConsumerConfig, mapResult, submit, pumpSubmitter, pumpScheduler, pumpDispatcher, statsInterval) =
+        log.Information("Consuming... {broker} {topics} {groupId} autoOffsetReset {autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlight={maxInFlightGB:n1}GB maxBatchDelay={maxBatchDelay}s",
+            config.Inner.BootstrapServers, config.Topics, config.Inner.GroupId, (let x = config.Inner.AutoOffsetReset in x.Value), config.Inner.FetchMaxBytes,
+            float config.Buffering.maxInFlightBytes / 1024. / 1024. / 1024., (let t = config.Buffering.maxBatchDelay in t.TotalSeconds))
         let limiterLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Core.Constants.messageCounterSourceContext)
-        let limiter = new Core.InFlightMessageCounter(limiterLog, config.buffering.minInFlightBytes, config.buffering.maxInFlightBytes)
+        let limiter = new Core.InFlightMessageCounter(limiterLog, config.Buffering.minInFlightBytes, config.Buffering.maxInFlightBytes)
         let consumer = ConsumerBuilder.WithLogging(log, config) // teardown is managed by ingester.Pump()
-        let submitter = Submission.SubmissionEngine(log, pumpInterval, maxSubmissionsPerPartition, scheduler.Submit, statsInterval)
-        let ingester = Ingestion.IngestionEngine<'M>(log, limiter, consumer, mapResult, submitter.Submit, emitInterval = config.buffering.maxBatchDelay, statsInterval = statsInterval)
+        let ingester = KafkaIngestionEngine<'M>(log, limiter, consumer, mapResult, submit, emitInterval = config.Buffering.maxBatchDelay, statsInterval = statsInterval)
         let cts = new CancellationTokenSource()
         let ct = cts.Token
         let tcs = new TaskCompletionSource<unit>()
+        let triggerStop () =
+            log.Information("Consuming ... Stopping {name}", consumer.Name)
+            cts.Cancel();  
         let start name f =
             let wrap (name : string) computation = async {
                 try do! computation
-                    log.Information("Exiting {name}", name)
-                with e -> log.Fatal(e, "Abend from {name}", name) }
+                    log.Information("Exiting pipeline component {name}", name)
+                with e ->
+                    log.Fatal(e, "Abend from pipeline component {name}", name)
+                    triggerStop() }
             Async.Start(wrap name f, ct)
         // if scheduler encounters a faulted handler, we propagate that as the consumer's Result
         let abend (exns : AggregateException) =
@@ -415,20 +435,39 @@ type ParallelConsumer private (inner : IConsumer<string, string>, task : Task<un
         let machine = async {
             // external cancellation should yield a success result
             use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
-            start "dispatcher" <| dispatcher.Pump()
+            start "dispatcher" <| pumpDispatcher
             // ... fault results from dispatched tasks result in the `machine` concluding with an exception
-            start "scheduler" <| scheduler.Pump abend
-            start "submitter" <| submitter.Pump()
+            start "scheduler" <| pumpScheduler abend
+            start "submitter" <| pumpSubmitter
             start "ingester" <| ingester.Pump()
 
             // await for either handler-driven abend or external cancellation via Stop()
             do! Async.AwaitTaskCorrect tcs.Task
         }
         let task = Async.StartAsTask machine
-        let triggerStop () =
-            log.Information("Consuming ... Stopping {name}", consumer.Name)
-            cts.Cancel();  
-        new ParallelConsumer(consumer, task, triggerStop)
+        new PipelinedConsumer(consumer, task, triggerStop)
+
+[<AbstractClass; Sealed>]
+type ParallelConsumer private () =
+    /// Builds a processing pipeline per the `config` running up to `dop` instances of `handle` concurrently to maximize global throughput across partitions.
+    /// Processor pumps until `handle` yields a `Choice2Of2` or `Stop()` is requested.
+    static member Start<'M>
+        (   log : ILogger, config : KafkaConsumerConfig, maxDop, mapResult : (ConsumeResult<string,string> -> 'M), handle : ('M -> Async<Choice<unit,exn>>),
+            ?maxSubmissionsPerPartition, ?pumpInterval, ?statsInterval, ?logExternalStats) =
+        let statsInterval = defaultArg statsInterval (TimeSpan.FromMinutes 5.)
+        let pumpInterval = defaultArg pumpInterval (TimeSpan.FromMilliseconds 5.)
+        let maxSubmissionsPerPartition = defaultArg maxSubmissionsPerPartition 5
+
+        let dispatcher = ParallelScheduling.Dispatcher maxDop
+        let scheduler = ParallelScheduling.PartitionedSchedulingEngine<'M>(log, handle, dispatcher.TryAdd, statsInterval, ?logExternalStats=logExternalStats)
+        let mapBatch onCompletion (x : SubmissionBatch<_>) : ParallelScheduling.Batch<'M> =
+            let onCompletion' () = x.onCompletion(); onCompletion()
+            { partitionId = x.partitionId; messages = x.messages; onCompletion = onCompletion'; } 
+        let submitBatch (x : ParallelScheduling.Batch<_>) : int =
+            scheduler.Submit x
+            x.messages.Length
+        let submitter = Submission.SubmissionEngine(log, maxSubmissionsPerPartition, mapBatch, submitBatch, statsInterval, pumpInterval)
+        PipelinedConsumer.Start(log, config, mapResult, submitter.Ingest, submitter.Pump(), scheduler.Pump, dispatcher.Pump(), statsInterval)
 
     /// Builds a processing pipeline per the `config` running up to `dop` instances of `handle` concurrently to maximize global throughput across partitions.
     /// Processor pumps until `handle` yields a `Choice2Of2` or `Stop()` is requested.
