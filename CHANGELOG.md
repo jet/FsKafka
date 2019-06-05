@@ -11,12 +11,13 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 ### Changed
 ### Removed
+
+- `Propulsion`.* - these have been moved to a dedicated repo:- https://github.com/jet/propulsion
+
 ### Fixed
 
-## [Unreleased]
-
 <a name="1.0.1-rc1"></a>
-## [1.0.0-rc1] - 2019-06-03
+## [1.0.1-rc1] - 2019-06-03
 
 ### Added
 
@@ -26,9 +27,6 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 
 - Targets `Confluent.Kafka` v `1.0.1`, `librdkafka.redist` v `1.0.1`
-
-### Removed
-### Fixed
 
 <a name="1.0.0-rc13"></a>
 ## [1.0.0-rc13] - 2019-06-01
