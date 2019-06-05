@@ -11,6 +11,7 @@ type ReaderSpec =
         forceRestart: bool
         /// Start position from which forward reading is to commence // Assuming no stored position
         start: StartPos
+        /// Frequency at which to update the Checkpoint store
         checkpointInterval: TimeSpan
         /// Delay when reading yields an empty batch
         tailInterval: TimeSpan
@@ -25,6 +26,22 @@ type ReaderSpec =
         minBatchSize: int }
 
 type StartMode = Starting | Resuming | Overridding
+
+[<AutoOpen>]
+module Mapping =
+    open EventStore.ClientAPI
+
+    type RecordedEvent with
+        member __.Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(__.CreatedEpoch)
+
+    let (|PropulsionEvent|) (x : RecordedEvent) =
+        { new Propulsion.Streams.IEvent<_> with
+            member __.EventType = x.EventType
+            member __.Data = if x.Data <> null && x.Data.Length = 0 then null else x.Data
+            member __.Meta = if x.Metadata <> null && x.Metadata.Length = 0 then null else x.Metadata
+            member __.Timestamp = x.Timestamp }
+    let (|PropulsionStreamEvent|) (x: RecordedEvent) : Propulsion.Streams.StreamEvent<_> =
+        { stream = x.EventStreamId; index = x.EventNumber; event = (|PropulsionEvent|) x }
 
 type EventStoreSource =
     static member Run
@@ -54,8 +71,7 @@ type EventStoreSource =
                     return Resuming, mkPos s.state.pos, TimeSpan.FromSeconds(float s.config.checkpointFreqS)
                 | Checkpoint.Folds.Running _, r ->
                     do! checkpoints.Override(spec.checkpointInterval, r.CommitPosition)
-                    return Overridding, r, spec.checkpointInterval
-            }
+                    return Overridding, r, spec.checkpointInterval }
             log.Information("Sync {mode} {groupName} @ {pos} (chunk {chunk}, {pct:p1}) checkpointing every {checkpointFreq:n1}m",
                 startMode, spec.groupName, startPos.CommitPosition, Reader.chunk startPos, float startPos.CommitPosition/float maxPos.CommitPosition,
                 checkpointFreq.TotalMinutes)
@@ -79,5 +95,5 @@ type EventStoreSource =
                 let cp = pos.CommitPosition
                 striper.Submit <| Message.Batch(seriesId, cp, checkpoints.Commit cp, xs)
         let reader = Reader.EventStoreReader(conns, spec.batchSize, spec.minBatchSize, categorize, tryMapEvent, post, spec.tailInterval, dop)
-        do! reader.Start (initialSeriesId,startPos) maxPos
+        let! _pumpReader = reader.Pump(initialSeriesId, startPos, maxPos)
         do! Async.AwaitKeyboardInterrupt() }

@@ -10,19 +10,10 @@ open System.Collections.Generic
 open System.Diagnostics
 open System.Threading
 
-type EventStore.ClientAPI.RecordedEvent with
-    member __.Timestamp = System.DateTimeOffset.FromUnixTimeMilliseconds(__.CreatedEpoch)
-
 let inline arrayBytes (x:byte[]) = if x = null then 0 else x.Length
 let inline recPayloadBytes (x: EventStore.ClientAPI.RecordedEvent) = arrayBytes x.Data + arrayBytes x.Metadata
 let inline payloadBytes (x: EventStore.ClientAPI.ResolvedEvent) = recPayloadBytes x.Event + x.OriginalStreamId.Length * 2
 let inline mb x = float x / 1024. / 1024.
-
-let toIngestionItem (e : RecordedEvent) : StreamEvent<byte[]> =
-    let meta' = if e.Metadata <> null && e.Metadata.Length = 0 then null else e.Metadata
-    let data' = if e.Data <> null && e.Data.Length = 0 then null else e.Data
-    let event : IEvent<byte[]> = Internal.EventData.Create(e.EventType, data', meta', e.Timestamp) :> _
-    { stream = e.EventStreamId; index = e.EventNumber; event = event }
 
 /// Maintains ingestion stats (thread safe via lock free data structures so it can be used across multiple overlapping readers)
 type OverallStats(?statsInterval) =
@@ -113,6 +104,7 @@ let fetchMax (conn : IEventStoreConnection) = async {
     let max = lastItemBatch.FromPosition
     Log.Information("EventStore Tail Position: @ {pos} ({chunks} chunks, ~{gb:n1}GB)", max.CommitPosition, chunk max, mb max.CommitPosition/1024.)
     return max }
+
 /// `fetchMax` wrapped in a retry loop; Sync process is entirely reliant on establishing the max so we have a crude retry loop
 let establishMax (conn : IEventStoreConnection) = async {
     let mutable max = None
@@ -126,14 +118,11 @@ let establishMax (conn : IEventStoreConnection) = async {
 
 /// Walks a stream within the specified constraints; used to grab data when writing to a stream for which a prefix is missing
 /// Can throw (in which case the caller is in charge of retrying, possibly with a smaller batch size)
-let pullStream (conn : IEventStoreConnection, batchSize) (stream,pos,limit : int option) (postBatch : string*StreamSpan<_> -> Async<unit>) =
+let pullStream (conn : IEventStoreConnection, batchSize) (stream,pos,limit : int option) mapEvent (postBatch : string*StreamSpan<_> -> Async<unit>) =
     let rec fetchFrom pos limit = async {
         let reqLen = match limit with Some limit -> min limit batchSize | None -> batchSize
         let! currentSlice = conn.ReadStreamEventsForwardAsync(stream, pos, reqLen, resolveLinkTos=true) |> Async.AwaitTaskCorrect
-        let events =
-            [| for x in currentSlice.Events ->
-                let e = x.Event
-                Propulsion.Streams.Internal.EventData.Create(e.EventType, e.Data, e.Metadata, e.Timestamp) :> IEvent<byte[]> |]
+        let events = currentSlice.Events |> Array.map (fun x -> mapEvent x.Event)
         do! postBatch (stream,{ index = currentSlice.FromEventNumber; events = events })
         match limit with
         | None when currentSlice.IsEndOfStream -> return ()
@@ -273,7 +262,7 @@ type EventStoreReader(conns : _ [], defaultBatchSize, minBatchSize, categorize, 
                     batchSize <- adjust batchSize
                     Log.Warning(e, "Tail $all failed, adjusting batch size to {bs}", batchSize) }
 
-    let pump (initialSeriesId, initialPos) max = async {
+    member __.Pump(initialSeriesId, initialPos, max) = async {
         let mutable robin = 0
         let selectConn () =
             let connIndex = Interlocked.Increment(&robin) % conns.Length
@@ -321,5 +310,3 @@ type EventStoreReader(conns : _ [], defaultBatchSize, minBatchSize, categorize, 
             | (false, _), None ->
                 dop.Release() |> ignore
                 do! Async.Sleep sleepIntervalMs }
-    member __.Start initialPos max = async {
-        let! _ = Async.StartChild (pump initialPos max) in () }
