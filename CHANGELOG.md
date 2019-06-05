@@ -9,11 +9,12 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- `Propulsion.EventStore.EventStoreSource` (productized from `Equinox.Templates`'s `eqxsync`)
+
 ### Changed
 ### Removed
 ### Fixed
-
-## [Unreleased]
 
 <a name="1.0.1-rc1"></a>
 ## [1.0.0-rc1] - 2019-06-03
