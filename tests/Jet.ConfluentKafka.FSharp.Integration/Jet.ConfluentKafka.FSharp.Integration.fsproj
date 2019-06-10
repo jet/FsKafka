@@ -8,12 +8,10 @@
 
   <ItemGroup>
     <Compile Include="Integration.fs" />
-    <Compile Include="ParallelConsumerIntegration.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Jet.ConfluentKafka.FSharp\Jet.ConfluentKafka.FSharp.fsproj" />
-    <ProjectReference Include="..\..\src\Propulsion.Kafka\Propulsion.Kafka.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

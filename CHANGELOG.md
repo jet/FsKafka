@@ -14,7 +14,11 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Fixed
 
 <a name="1.0.0-rc14"></a>
-## [1.0.0-rc13] - 2019-06-01
+## [1.0.0-rc14] - 2019-06-10
+
+### Removed
+
+- `Propulsion.*` (only released with `1.0.1` targeting, on other repo)
 
 ### Fixed
 
