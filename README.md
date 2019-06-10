@@ -1,19 +1,21 @@
-# Jet.ConfluentKafka.FSharp 1.x [![Build Status](https://dev.azure.com/jet-opensource/opensource/_apis/build/status/jet.Jet.ConfluentKafka.FSharp)](https://dev.azure.com/jet-opensource/opensource/_build/latest?definitionId=7) [![release](https://img.shields.io/github/release-pre/jet/Jet.ConfluentKafka.FSharp.svg)](https://github.com/jet/Jet.ConfluentKafka.FSharp/releases) [![NuGet](https://img.shields.io/nuget/vpre/Jet.ConfluentKafka.FSharp.svg?logo=nuget)](https://www.nuget.org/packages/Jet.ConfluentKafka.FSharp/) [![license](https://img.shields.io/github/license/jet/Jet.ConfluentKafka.FSharp.svg)](LICENSE) ![code size](https://img.shields.io/github/languages/code-size/jet/Jet.ConfluentKafka.FSharp.svg)
+# Jet.ConfluentKafka.FSharp 1.x [![Build Status](https://dev.azure.com/jet-opensource/opensource/_apis/build/status/jet.Jet.ConfluentKafka.FSharp)](https://dev.azure.com/jet-opensource/opensource/_build/latest?definitionId=7) [![release](https://img.shields.io/github/release-pre/jet/Jet.ConfluentKafka.FSharp.svg)](https://github.com/jet/Jet.ConfluentKafka.FSharp/releases) [![NuGet](https://img.shields.io/nuget/v/Jet.ConfluentKafka.FSharp.svg?logo=nuget)](https://www.nuget.org/packages/Jet.ConfluentKafka.FSharp/) [![license](https://img.shields.io/github/license/jet/Jet.ConfluentKafka.FSharp.svg)](LICENSE) ![code size](https://img.shields.io/github/languages/code-size/jet/Jet.ConfluentKafka.FSharp.svg)
 
 F# friendly wrapper for `Confluent.Kafka` versions `>= 1.0.0`, with minimal dependencies or additional abstractions.
 
 **See also: [`v0` branch](https://github.com/jet/Jet.ConfluentKafka.FSharp/tree/v0), which targets `Confluent.Kafka` versions `0.11.*` and is designed for compatibility with the [Kafunk](https://github.com/jet/kafunk) API.**
 
-## QuickStart
-
-See [the Equinox QuickStart](https://github.com/jet/equinox#quickstart) for examples of using this library to project to Kafka from `Equinox.Cosmos` and/or `Equinox.EventStore`.
-
 ## Components
 
 The components within this repository are delivered as a multi-targeted Nuget package targeting `net461` (F# 3.1+) and `netstandard2.0` (F# 4.5+) profiles
 
-- [![NuGet](https://img.shields.io/nuget/vpre/Jet.ConfluentKafka.FSharp.svg)](https://www.nuget.org/packages/Jet.ConfluentKafka.FSharp/) `Jet.ConfluentKafka.FSharp`: Wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. Alternately, the `ParallelConsumer` provides deeper logging and higher throughput for scenarios where consuming in batches is not a useful paradigm.
-  [Depends](https://www.fuget.org/packages/Jet.ConfluentKafka.FSharp) on `Confluent.Kafka [1.0.1]`, `librdkafka [1.0.1]` (pinned to ensure we use a tested pairing enterprise wide), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
+- [![NuGet](https://img.shields.io/nuget/v/Jet.ConfluentKafka.FSharp.svg)](https://www.nuget.org/packages/Jet.ConfluentKafka.FSharp/) `Jet.ConfluentKafka.FSharp`: Wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. [Depends](https://www.fuget.org/packages/Jet.ConfluentKafka.FSharp) on `Confluent.Kafka [1.0.1]`, `librdkafka [1.0.1]` (pinned to ensure we use a tested pairing enterprise wide), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
+- [![NuGet](https://img.shields.io/nuget/vpre/Propulsion.Kafka.svg)](https://www.nuget.org/packages/Propulsion.Kafka/) `Propulsion.Kafka`. Provides bindings for producing and consuming both streamwise and in parallel. Includes a standard codec for use with streamwise projection and consumption, `Propulsion.Kafka.Codec.RenderedSpan`. [Depends](https://www.fuget.org/packages/Propulsion.Kafka) on `Jet.ConfluentKafka.FSharp`, `Serilog`
+
+## Related repos
+
+- See [the Propulsion repo](https://github.com/jet/propulsion) for extended Producers and Consumers.
+- See [the Jet `dotnet new` templates repo](https://github.com/jet/dotnet-templates)'s `eqxprojector` template (in `-k` mode) for example producer/consumer logic using the `BatchedProducer` and `BatchedConsumer` from `Jet.ConfluentKafka.FSharp`, alongside the extended modes in `Propulsion`.
+- See [the Equinox QuickStart](https://github.com/jet/equinox#quickstart) for examples of using this library to project to Kafka from `Equinox.Cosmos` and/or `Equinox.EventStore`.
 
 ## CONTRIBUTING
 
