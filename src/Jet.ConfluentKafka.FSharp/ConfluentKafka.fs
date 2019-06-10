@@ -385,7 +385,7 @@ module private ConsumerImpl =
                     with e ->
                         tcs.TrySetException e |> ignore
                         cts.Cancel()
-                    do! loop() }
+                    return! loop() }
 
             Async.Start(loop(), cts.Token)
 
@@ -403,9 +403,9 @@ module private ConsumerImpl =
                     | :? System.OperationCanceledException -> log.Warning("Consuming... cancelled {name}", consumer.Name)
         finally
             consumer.Close()
-        
+
         // await for handler faults or external cancellation
-        do! Async.AwaitTaskCorrect tcs.Task
+        return! Async.AwaitTaskCorrect tcs.Task
     }
 
 /// Creates and wraps a Confluent.Kafka IConsumer, wrapping it to afford a batched consumption mode with implicit offset progression at the end of each

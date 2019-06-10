@@ -16,7 +16,10 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Fixed
 
+- remove leak due to incorrect tail-recursion (`do!` -> `return!`) [#39](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/39)
+
 <a name="1.0.1-rc1"></a>
+
 ## [1.0.1-rc1] - 2019-06-03
 
 ### Added
@@ -27,6 +30,13 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 
 - Targets `Confluent.Kafka` v `1.0.1`, `librdkafka.redist` v `1.0.1`
+
+<a name="1.0.0-rc14"></a>
+## [1.0.0-rc14] - 2019-06-10
+
+### Fixed
+
+- remove leak due to incorrect tail-recursion (`do!` -> `return!`) (Cherry pick of [#39](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/39))
 
 <a name="1.0.0-rc13"></a>
 ## [1.0.0-rc13] - 2019-06-01
@@ -178,6 +188,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 [Unreleased]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.1-rc1...HEAD
 [1.0.1-rc1]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.0-rc13...1.0.1-rc1
+[1.0.0-rc14]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.0-rc13...1.0.0-rc14
 [1.0.0-rc13]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.0-rc12...1.0.0-rc13
 [1.0.0-rc12]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.0-rc11...1.0.0-rc12
 [1.0.0-rc11]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.0-rc10...1.0.0-rc11
