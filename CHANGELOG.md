@@ -16,6 +16,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Fixed
 
+- remove leak due to incorrect tail-recursion (`do!` -> `return!`) [#36](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/36)
+
 <a name="1.0.1-rc1"></a>
 ## [1.0.1-rc1] - 2019-06-03
 

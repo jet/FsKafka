@@ -385,7 +385,7 @@ module private ConsumerImpl =
                     with e ->
                         tcs.TrySetException e |> ignore
                         cts.Cancel()
-                    do! loop() }
+                    return! loop() }
 
             Async.Start(loop(), cts.Token)
 
