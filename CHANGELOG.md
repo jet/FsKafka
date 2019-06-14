@@ -16,6 +16,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+- Fixed and clarified defaulting behavior for `fetchMaxBytes`
+
 <a name="1.0.1"></a>
 ## [1.0.1] - 2019-06-10
 

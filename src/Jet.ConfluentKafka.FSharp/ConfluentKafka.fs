@@ -196,8 +196,10 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             groupId,
             /// Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest. Default: start from Earliest.
             ?autoOffsetReset,
-            /// Default 100kB.
+            /// Default 100kB. Confluent.Kafka default: 500MB
             ?fetchMaxBytes,
+            /// Default: use `fetchMaxBytes` value (or its default, 100kB). Confluent.Kafka default: 1mB
+            ?messageMaxBytes,
             /// Minimum number of bytes to wait for (subject to timeout with default of 100ms). Default 1B.
             ?fetchMinBytes,
             /// Stats reporting interval for the consumer. Default: no reporting.
@@ -221,12 +223,13 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             ?maxBatchSize) =
         let maxInFlightBytes = defaultArg maxInFlightBytes (16L * 1024L * 1024L)
         let minInFlightBytes = defaultArg minInFlightBytes (maxInFlightBytes * 2L / 3L)
+        let fetchMaxBytes = defaultArg fetchMaxBytes 100_000
         let c =
             ConsumerConfig(
                 ClientId=clientId, BootstrapServers=Config.validateBrokerUri broker, GroupId=groupId,
                 AutoOffsetReset = Nullable (defaultArg autoOffsetReset AutoOffsetReset.Earliest), // default: latest
-                FetchMaxBytes = Nullable (defaultArg fetchMaxBytes 100_000), // default: 524_288_000
-                MessageMaxBytes = Nullable (defaultArg fetchMaxBytes 100_000), // default 1_000_000
+                FetchMaxBytes = Nullable fetchMaxBytes, // default: 524_288_000
+                MessageMaxBytes = Nullable (defaultArg messageMaxBytes fetchMaxBytes), // default 1_000_000
                 EnableAutoCommit = Nullable true, // at AutoCommitIntervalMs interval, write value supplied by StoreOffset call
                 EnableAutoOffsetStore = Nullable false, // explicit calls to StoreOffset are the only things that effect progression in offsets
                 LogConnectionClose = Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
