@@ -10,6 +10,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+
+- Added `Producing... ` prefix to log messages for conistency
+
 ### Removed
 ### Fixed
 

@@ -92,8 +92,8 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
             config.Broker, topic, config.Compression, config.MaxInFlight, config.Acks)
         let p =
             ProducerBuilder<string, string>(config.Inner)
-                .SetLogHandler(fun _p m -> log.Information("{message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
-                .SetErrorHandler(fun _p e -> log.Error("{reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
+                .SetLogHandler(fun _p m -> log.Information("Producing... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
+                .SetErrorHandler(fun _p e -> log.Error("Producing... {reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
                 .Build()
         new KafkaProducer(p, topic)
 
