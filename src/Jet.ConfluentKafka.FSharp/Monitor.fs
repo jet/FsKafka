@@ -190,10 +190,10 @@ module Legacy =
             partitions |> Seq.map (fun p -> p.lead) |> Seq.min
           else Offset.Unset.Value }}
     
-   type PartitionResultKey =
-    | NoErrorKey
-    | Rule2ErrorKey
-    | Rule3ErrorKey
+type PartitionResultKey =
+| NoErrorKey
+| Rule2ErrorKey
+| Rule3ErrorKey
 
 type PartitionResult =
     | NoError
@@ -201,9 +201,9 @@ type PartitionResult =
     | Rule3Error
 with
     static member toKey = function
-        | NoError -> Legacy.NoErrorKey
-        | Rule2Error _ -> Legacy.Rule2ErrorKey
-        | Rule3Error -> Legacy.Rule3ErrorKey
+        | NoError -> NoErrorKey
+        | Rule2Error _ -> Rule2ErrorKey
+        | Rule3Error -> Rule3ErrorKey
     static member toString = function
         | NoError ->  ""
         | Rule2Error lag -> string lag
@@ -355,22 +355,6 @@ module Rules =
 
 module private Logging =
 
-    let private formatRule2Errors consumerGroup topic errors =
-        let stalledPartitions =
-            errors
-            |> Seq.map (fun (partition, lag) -> sprintf "(%i, %s)" partition lag)
-            |> Strings.join " "
-
-        sprintf "Lag present and offsets not progressing (partition,lag)|consumerGroup=%s|topic=%s|stalledPartitions=%s" consumerGroup topic stalledPartitions
-
-    let private formatRule3Errors consumerGroup topic errors =
-        let laggingPartitions =
-            errors
-            |> Seq.map (fun (partition, lag) -> sprintf "(%i, %s)" partition lag)
-            |> Strings.join " "
-
-        sprintf "Consumer lag is consistently increasing|consumerGroup=%s|topic=%s|laggingPartitions=%s" consumerGroup topic laggingPartitions
-
     let logResults (log : ILogger) consumerGroup topic (partitionResults : (int * PartitionResult) []) =
 
         let results = partitionResults |> Array.groupBy (snd >> PartitionResult.toKey)
@@ -380,13 +364,11 @@ module private Logging =
             | (Rule2ErrorKey, errors) -> 
                 errors
                 |> Array.map (mapSnd PartitionResult.toString)
-                |> formatRule2Errors consumerGroup topic
-                |> fun s -> log.Error("{s}", s)
+                |> fun sp -> log.Error("Lag present and offsets not progressing (partition,lag)|consumerGroup={consumerGroup}|topic={topic}|stalledPartitions={@stalledPartitions}", consumerGroup, topic, sp)
             | (Rule3ErrorKey, errors) -> 
                 errors
                 |> Array.map (mapSnd PartitionResult.toString)
-                |> formatRule3Errors consumerGroup topic
-                |> fun s -> log.Error("{s}", s)
+                |> fun lp -> log.Error("Consumer lag is consistently increasing|consumerGroup={consumerGroup}|topic{topic}|laggingPartitions={@laggingPartitions}", consumerGroup, topic, lp)
 
         match results with
         | [|NoErrorKey, _|] ->
@@ -414,8 +396,7 @@ module private Helpers =
         let partitionOffsets =
             partitionInfos
             |> Seq.sortBy (fun p -> p.partition)
-            |> Seq.map (fun p -> sprintf "(%i, %O, %O)" p.partition p.highWatermarkOffset p.consumerOffset)
-            |> Strings.join " "
+            |> Seq.map (fun p -> p.partition, p.highWatermarkOffset, p.consumerOffset)
 
         let aggregateLag = partitionInfos |> Seq.sumBy (fun p -> p.lag)
 
