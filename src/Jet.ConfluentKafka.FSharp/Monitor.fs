@@ -487,7 +487,7 @@ type MonitorConfig = {
 }
 
 let private DefaultPollInterval = TimeSpan.FromSeconds 30.
-let private DefaultWindowSize = 60
+let private DefaultWindowSize = 60    
 
 type KafkaMonitorConfig = {
     kafkaHost : string
