@@ -20,9 +20,9 @@ let createTestProducer () = Kafka.Producer.createDefaultProducer kafkaConn
 
 let createTestMonitorConfig consumer errorHandler =
     {     KafkaMonitorConfig.Default kafkaConn testGroup consumer with
-          pollInterval = TimeSpan.FromSeconds 5.
-          windowSize = 10
-          errorHandler = errorHandler }
+              pollInterval = TimeSpan.FromSeconds 5.
+              windowSize = 10
+              errorHandler = errorHandler }
 
 [<Fact>]
 let ``Monitor should detect stalled consumer`` () = async {

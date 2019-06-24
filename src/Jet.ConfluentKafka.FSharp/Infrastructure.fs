@@ -5,7 +5,10 @@ open System.Threading.Tasks
 
 [<AutoOpen>]
 module private AsyncHelpers =
-    type Async with
+    type Async =
+        static member map (f : 't -> 'u) (xa: Async<'t>): Async<'u> = async {
+            let! x = xa
+            return f x }
         static member AwaitTaskCorrect (task : Task<'T>) : Async<'T> =
             Async.FromContinuations <| fun (k,ek,_) ->
                 task.ContinueWith (fun (t:Task<'T>) ->

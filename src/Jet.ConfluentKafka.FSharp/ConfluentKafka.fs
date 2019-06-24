@@ -260,7 +260,7 @@ type KafkaPartitionMetrics =
         consumerLag: int64 }        
 
 type ConsumerBuilder =
-    static member WithLogging(log : ILogger, config, ?onRevoke) =
+    static member WithLogging(log : ILogger, config, ?onAssign, ?onRevoke) =
         if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
         let consumer =
             ConsumerBuilder<_,_>(config.inner)
@@ -282,7 +282,8 @@ type ConsumerBuilder =
                             log.Information("Consuming... Stats {topic:l} totalLag {totalLag} {@stats}", topic, totalLag, metrics))
                 .SetPartitionsAssignedHandler(fun _c xs ->
                     for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
-                        log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions))
+                        log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions)
+                    onAssign |> Option.iter (fun f -> f xs))
                 .SetPartitionsRevokedHandler(fun _c xs ->
                     for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
                         log.Information("Consuming... Revoked {topic:l} {partitions}", topic, partitions)
@@ -429,7 +430,7 @@ type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, 
     /// Starts a Kafka consumer with the provided configuration. Batches are grouped by topic partition.
     /// Batches belonging to the same topic partition will be scheduled sequentially and monotonically; however batches from different partitions can run concurrently.
     /// Completion of the `partitionHandler` saves the attained offsets so the auto-commit can mark progress; yielding an exception terminates the processing
-    static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>) =
+    static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>, ?monitoring : MonitorConfig) =
         if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
         log.Information("Consuming... {broker} {topics} {groupId} autoOffsetReset={autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlight={maxInFlightGB:n1}GB maxBatchDelay={maxBatchDelay}s maxBatchSize={maxBatchSize}",
             config.inner.BootstrapServers, config.topics, config.inner.GroupId, (let x = config.inner.AutoOffsetReset in x.Value), config.inner.FetchMaxBytes,
