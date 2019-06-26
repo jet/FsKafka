@@ -1,152 +1,110 @@
 module Jet.ConfluentKafka.FSharp.Integration.MonitorIntegration
 
-open Jet.ConfluentKafka.FSharp.Monitor
-open Serilog
+open Jet.ConfluentKafka.FSharp
 open System
 open Xunit
-open Newtonsoft.Json
+open Confluent.Kafka
+open System.Threading
+open Swensen.Unquote
 
-let kafkaConn = "shared.kafka.eastus2.dev.jet.network:9092"
-let testGroup = "thor-asgard-test-consumer-group"
-let testTopic = "thor-asgard-test-topic"
+let mkGuid () = let g = System.Guid.NewGuid() in g.ToString("N")
+let mkMonitorConfig handler = KafkaMonitorConfig.Create(onStatus=handler, pollInterval = TimeSpan.FromSeconds 5., windowSize = 20)
+let mkProducer log broker topic =
+    // Needs to be random to fill al partitions
+    let config = KafkaProducerConfig.Create("tiger", broker, Acks.Leader, partitioner = Partitioner.Random)
+    KafkaProducer.Create(log, config, topic)
+let createConsumerConfig broker topic groupId =
+    KafkaConsumerConfig.Create("tiger", broker, [topic], groupId, maxBatchSize = 1)
+let startConsumerFromConfig log config handler monitorHandler =
+    BatchedConsumer.Start(log, config, handler, monitorConfig = mkMonitorConfig monitorHandler)
+let startConsumer log broker topic groupId handler monitorHandler =
+    let config = createConsumerConfig broker topic groupId
+    startConsumerFromConfig log config handler monitorHandler
+let producerOnePerSecondLoop (producer : KafkaProducer) =
+    let rec loop () = async {
+        let! _ = producer.ProduceAsync("a","1")
+        do! Async.Sleep 1000
+        return! loop () }
+    loop ()
+let onlyConsumeFirstBatchHandler =
+    let observedPartitions = System.Collections.Concurrent.ConcurrentDictionary()
+    fun (items : ConsumeResult<string,string>[]) -> async {
+        // make first handle succeed to ensure consumer has offsets
+        let partitionId = let p = items.[0].Partition in p.Value
+        if not <| observedPartitions.TryAdd(partitionId,()) then do! Async.Sleep Int32.MaxValue }
 
-type ILogger with
-    member __.ForContextNamed name = __.ForContext(Serilog.Core.Constants.SourceContextPropertyName, name)
+type T1(testOutputHelper) =
+    let log, broker = createLogger (TestOutputAdapter testOutputHelper), getTestBroker ()
 
-let createTestConsumer () =
-    Kafka.Consumer.createDefaultConsumer kafkaConn testTopic testGroup
+    [<Fact>]
+    let ``Monitor should detect stalled consumer`` () = async {
+        let topic, group = mkGuid (), mkGuid () // dev kafka topics are created and truncated automatically
+        let producer = mkProducer log broker topic
+        let! _producerActivity = Async.StartChild <| producerOnePerSecondLoop producer
 
-let createTestProducer () = Kafka.Producer.createDefaultProducer kafkaConn
+        let mutable errorObserved = false
+        let observeErrorsMonitorHandler (states : (int * PartitionResult) list) =
+            errorObserved <- errorObserved
+                || states |> List.exists (function _,PartitionResult.ErrorPartitionStalled _ -> true | _ -> false)
 
-let createTestMonitorConfig consumer errorHandler =
-    {     KafkaMonitorConfig.Default kafkaConn testGroup consumer with
-              pollInterval = TimeSpan.FromSeconds 5.
-              windowSize = 10
-              errorHandler = errorHandler }
+        // start stalling consumer
+        use _consumer = startConsumer log broker topic group onlyConsumeFirstBatchHandler observeErrorsMonitorHandler
+        while not <| Volatile.Read(&errorObserved) do
+            do! Async.Sleep 1000 }
 
-[<Fact>]
-let ``Monitor should detect stalled consumer`` () = async {
-    let producerLog = Log.Logger.ForContextNamed "ProducerLogger"
-    let producer = createTestProducer()
-    let consumer = createTestConsumer()
+type T2(testOutputHelper) =
+    let log, broker = createLogger (TestOutputAdapter testOutputHelper), getTestBroker ()
 
-    let mutable errorReceived = false
+    [<Fact>]
+    let ``Monitor should continue checking progress after rebalance`` () = async {
+        let topic, group = mkGuid (), mkGuid () // dev kafka topics are created and truncated automatically
+        let producer = mkProducer log broker topic
+        let mutable progressChecked, numPartitions = false, 0
 
-    let errorHandler _ _ (errors : (int * PartitionResult) []) =
-        let hasError =
-            errors
-            |> Array.tryFind (fun (_, error) -> error <> NoError)
-            |> Option.isSome
+        let partitionsObserver (errors : (int * PartitionResult) list) =
+            progressChecked <- true
+            numPartitions <- errors.Length
 
-        if hasError then errorReceived <- true
+        let! _producerActivity = Async.StartChild <| producerOnePerSecondLoop producer
+        
+        use _consumerOne = startConsumer log broker topic group onlyConsumeFirstBatchHandler partitionsObserver
+        // first consumer is only member of group, should have all partitions
+        while 4 <> Volatile.Read(&numPartitions) do
+            do! Async.Sleep 1000
 
-    let monitorConfig = createTestMonitorConfig consumer errorHandler
+        4 =! numPartitions
 
-    let mutable firstHandle = true
-    let laggingHandle _  =
-        if firstHandle then
-            // make first handle succeed to ensure consumer has offsets
-            firstHandle <- false
-            async { () }
-        else
-            Async.Sleep(100000000)
+        // create second consumer and join group to trigger rebalance
+        use _consumerOne = startConsumer log broker topic group onlyConsumeFirstBatchHandler ignore
+        progressChecked <- false
 
-    let rec producerLoop () = async {
-        let! _ = Kafka.Producer.produceBatch producer testTopic [| JsonConvert.SerializeObject( [| "x" .= 1|], (string 1))|]
-        do! Async.Sleep(1000)
-        return! producerLoop()
+        // make sure the progress was checked after rebalance
+        while 2 <> Volatile.Read(&numPartitions) do
+            do! Async.Sleep 1000
+        
+        // with second consumer in group, first consumer should have half of the partitions
+        2 =! numPartitions
     }
 
-    // start test producer
-    producerLoop ()
-    |> Async.Start
-    
-    // start stalled consumer
-    Kafka.Consumer.consume consumer laggingHandle 
-    |> runWithKafkaMonitor monitorConfig
-    |> Async.Start
+type T3(testOutputHelper) =
+    let log, broker = createLogger (TestOutputAdapter testOutputHelper), getTestBroker ()
 
-    do! Async.Sleep(120000)
+    [<Fact>]
 
-    Assert.True(errorReceived)
-    consumer.ConfluentConsumer.Unsubscribe()
-}
+    let ``Monitor should not join consumer group`` () = async {
+        let topic, group = mkGuid (), mkGuid () // dev kafka topics are created and truncated automatically
+        let noopObserver _ = ()
+        let config = createConsumerConfig broker topic group
+        use consumer = startConsumerFromConfig log config onlyConsumeFirstBatchHandler noopObserver
 
-[<Fact>]
-let ``Monitor should continue checking progress after rebalance`` () = async {
-    let producerLog = Log.Logger.ForContextNamed("ProducerLogger")
-    let producer = createTestProducer()
-    let consumerOne = createTestConsumer()
+        // TODO wait for assignmment instead
+        do! Async.Sleep 10000
 
-    let mutable progressChecked = false
-    let mutable numPartitions = 0
+        let acc = AdminClientConfig(config.Inner)
+        let ac = AdminClientBuilder(acc).Build()
 
-    let errorHandler _ _ (errors : (int * PartitionResult) []) =
-        numPartitions <- errors.Length
-        progressChecked <- true
-
-    let monitorConfig = createTestMonitorConfig consumerOne errorHandler
-
-    let mutable firstHandle = true
-    let laggingHandle _  =
-        if firstHandle then
-            // make first handle succeed to ensure consumer has offsets
-            firstHandle <- false
-            async { () }
-        else
-            Async.Sleep(100000000)
-
-    let rec producerLoop () = async {
-        do! Kafka.Producer.produceBatch producer testTopic [|(jobj [| "x" .= 1|], (string 1))|] |> Async.Ignore
-        do! Async.Sleep(1000)
-        return! producerLoop()
+        // should be one member in group
+        1 =! ac.ListGroup(group, TimeSpan.FromSeconds 30.).Members.Count
+        // consumer should have all 4 partitions assigned to it
+        4 =! consumer.Inner.Assignment.Count
     }
-
-    // start test producer
-    producerLoop()
-    |> Async.Start
-    
-    // start first consumer
-    Kafka.Consumer.consume consumerOne laggingHandle 
-    |> runWithKafkaMonitor monitorConfig
-    |> Async.Start
-
-    do! Async.Sleep(120000)
-
-    // first consumer is only member of group, should have all partitions
-    Assert.Equal(4, numPartitions)
-
-    // create second consumer and join group to trigger rebalance
-    let consumerTwo = createTestConsumer()
-    progressChecked <- false
-
-    do! Async.Sleep(120000)
-
-    // make sure the progress was checked after rebalance
-    Assert.True(progressChecked)
-    // with second consumer in group, first consumer should have half of the partitions
-    Assert.Equal(2, numPartitions)
-    consumerOne.ConfluentConsumer.Unsubscribe()
-    consumerTwo.ConfluentConsumer.Unsubscribe()
-}
-
-[<Fact>]
-let ``Monitor should not join consumer group`` () = async {
-    let consumer = createTestConsumer()
-
-    let noOpHandler _ = async { () }
-
-    let monitorConfig = createTestMonitorConfig consumer (fun _ _ _ -> ())
-
-    Kafka.Consumer.consume consumer noOpHandler
-    |> runWithKafkaMonitor monitorConfig
-    |> Async.Start
-
-    do! Async.Sleep(10000)
-
-    // should be one member in group
-    Assert.Equal(1, consumer.ConfluentConsumer.ListGroup(testGroup).Members.Count)
-    // consumer should have all 4 partitions assigned to it
-    Assert.Equal(4, consumer.ConfluentConsumer.Assignment.Count)
-    consumer.ConfluentConsumer.Unsubscribe()
-}

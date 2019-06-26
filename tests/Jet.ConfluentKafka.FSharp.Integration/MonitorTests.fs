@@ -1,8 +1,9 @@
 module Jet.ConfluentKafka.FSharp.Integration.MonitorTests
-open Jet.ConfluentKafka.FSharp.Monitor
 
-open Xunit
+open Jet.ConfluentKafka.FSharp
+open Jet.ConfluentKafka.FSharp.Impl
 open Swensen.Unquote
+open Xunit
 
 let testGroup = "TestConsumerGroup"
 let testTopic = "TestTopic"
@@ -25,6 +26,8 @@ let consumerInfo consumerOffset lag =
 // In all cases, we include a partition which has no lag, to ensure that the absence of lag on one
 // partition does not cause the monitor to ignore lag on another partition.
 
+let checkRules = Array.ofSeq << Rules.checkRulesForAllPartitions
+
 [<Fact>]
 let ``No errors because rule 1 is met`` () =
     let consumerInfos = [|
@@ -40,16 +43,12 @@ let ``No errors because rule 1 is met`` () =
         consumerInfo 100L 5L
     |]
 
-    let result = Rules.checkRulesForAllPartitions consumerInfos
+    let result = checkRules consumerInfos
 
     test 
-        <@ 
-            result = 
-                [|
-                    (0, NoError)
-                    (1, NoError)
-                |] 
-        @>
+        <@ result = 
+                [|  0, OkReachedZero
+                    1, OkReachedZero |] @>
 
 [<Fact>]
 let ``Error because rule 2 is violated`` () =
@@ -66,16 +65,11 @@ let ``Error because rule 2 is violated`` () =
         consumerInfo 10L 3L
     |]
 
-    let result = Rules.checkRulesForAllPartitions consumerInfos
+    let result = checkRules consumerInfos
 
-    test 
-        <@ 
-            result = 
-                [|
-                    (0, Rule2Error 3L)
-                    (1, NoError)
-                |] 
-        @>
+    test <@ result = 
+                [|  0, ErrorPartitionStalled 3L
+                    1, OkReachedZero |] @>
 
 [<Fact>]
 let ``Error because rule 3 is violated`` () =
@@ -92,16 +86,11 @@ let ``Error because rule 3 is violated`` () =
         consumerInfo 100L 3L
     |]
 
-    let result = Rules.checkRulesForAllPartitions consumerInfos
+    let result = checkRules consumerInfos
 
-    test 
-        <@ 
-            result = 
-                [|
-                    (0, Rule3Error)
-                    (1, NoError)
-                |] 
-        @>
+    test <@ result = 
+                [|  0, WarningLagIncreasing
+                    1, OkReachedZero |] @>
 
 [<Fact>]
 let ``No error because rule 3 is not violated`` () =
@@ -118,13 +107,8 @@ let ``No error because rule 3 is not violated`` () =
         consumerInfo 100L 6L
     |]
 
-    let result = Rules.checkRulesForAllPartitions consumerInfos
+    let result = checkRules consumerInfos
 
-    test 
-        <@ 
-            result = 
-                [|
-                    (0, NoError)
-                    (1, NoError)
-                |]
-        @>
+    test <@ result = 
+                [|  0, Healthy
+                    1, OkReachedZero |] @>
