@@ -248,15 +248,15 @@ module MonitorImpl =
 
     let run (consumer : IConsumer<'k,'v> ) (intervalMs,windowSize,failResetCount) (topic : string) (group : string) (onQuery,onCheckFailed,onStatus) =
         let getAssignedPartitions () = seq { for x in consumer.Assignment do if x.Topic = topic then yield let p = x.Partition in p.Value }
-        let mutable assignments = getAssignedPartitions() |> set
-        let mutable buffer = new RingBuffer<_>(assignments.Count*windowSize)
-        let validateAssignments () =
-            let current = getAssignedPartitions() |> set
-            if current <> assignments then
-                if current.Count = assignments.Count then buffer.Clear()
-                else buffer <- new RingBuffer<_>(windowSize*current.Count)
-                assignments <- current
-            assignments.Count <> 0
+        let buffer = new RingBuffer<_>(windowSize)
+        let validateAssignments =
+            let mutable assignments = getAssignedPartitions() |> set
+            fun () ->
+                let current = getAssignedPartitions() |> set
+                if current <> assignments then
+                    buffer.Clear()
+                    assignments <- current
+                assignments.Count <> 0
 
         let checkConsumerProgress () = async {
             let! res = queryConsumerProgress consumer topic
