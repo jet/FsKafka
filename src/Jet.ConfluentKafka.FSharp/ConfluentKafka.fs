@@ -62,10 +62,10 @@ type KafkaProducerConfig private (inner, broker : Uri) =
                 MessageSendMaxRetries = Nullable (defaultArg retries 60), // default 2
                 Acks = Nullable acks,
                 SocketKeepaliveEnable = Nullable (defaultArg socketKeepAlive true), // default: false
-                LogConnectionClose = Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
-        maxInFlight |> Option.iter (fun x -> c.MaxInFlight <- Nullable x) // default 1_000_000
+                LogConnectionClose = Nullable false, // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
+                MaxInFlight = Nullable (defaultArg maxInFlight 1_000_000)) // default 1_000_000
         linger |> Option.iter<TimeSpan> (fun x -> c.LingerMs <- Nullable (int x.TotalMilliseconds)) // default 0
-        partitioner |> Option.iter (fun x -> c.Partitioner <- x)
+        partitioner |> Option.iter (fun x -> c.Partitioner <- Nullable x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable (int x.TotalMilliseconds))
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
