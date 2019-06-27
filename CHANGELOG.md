@@ -11,10 +11,12 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 ### Changed
 
-- Added `Producing... ` prefix to log messages for conistency
+- Added `Producing... ` prefix to log messages for consistency
 
 ### Removed
 ### Fixed
+
+- Fixed and clarified defaulting behavior for `fetchMaxBytes`,`maxInFlight`,`partitioner` arguments [#40](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/40)
 
 <a name="1.0.1"></a>
 ## [1.0.1] - 2019-06-10
