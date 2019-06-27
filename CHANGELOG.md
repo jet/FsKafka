@@ -11,6 +11,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 ### Changed
 
+- Targets `Confluent.Kafka` v `1.1.0`, `librdkafka.redist` v `1.1.0`
 - Added `Producing...` prefix to log messages for consistency
 - Made `Consuming...` prefixes for log messages consistent
 - Tidied logging of `Unset` values in `Consuming... Committed` messsage
