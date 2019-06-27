@@ -14,10 +14,15 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Changed
 
-- Added `Producing... ` prefix to log messages for consistency
+- Added `Producing...` prefix to log messages for consistency
+- Made `Consuming...` prefixes for log messages consistent
+- Tidied logging of `Unset` values in `Consuming... Committed` messsage
+- `ConsumerBuilder.WithLogging` signature change (NB breaking vs `1.0.1`, affects users of [Propulsion libraries](https://github.com/jet/propulsion) only)
 
 ### Removed
 ### Fixed
+
+- Fixed and clarified defaulting behavior for `fetchMaxBytes`,`maxInFlight`,`partitioner` arguments [#40](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/40)
 
 <a name="1.0.1"></a>
 ## [1.0.1] - 2019-06-10
