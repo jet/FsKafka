@@ -1,8 +1,8 @@
 namespace Jet.ConfluentKafka.FSharp
 
 open Confluent.Kafka
-open Newtonsoft.Json.Linq
 open Newtonsoft.Json
+open Newtonsoft.Json.Linq
 open Serilog
 open System
 open System.Collections.Concurrent
@@ -259,6 +259,18 @@ type KafkaPartitionMetrics =
         [<JsonProperty("consumer_lag")>]
         consumerLag: int64 }        
 
+type OffsetValue =
+    | Unset
+    | Valid of offset: int64
+    static member ofOffset(offset : Offset) =
+        match offset.Value with
+        | _ when offset = Offset.Unset -> Unset
+        | valid -> Valid valid
+    override this.ToString() =
+        match this with
+        | Unset -> "Unset"
+        | Valid value -> value.ToString()
+
 type ConsumerBuilder =
     static member WithLogging(log : ILogger, config, ?onAssign, ?onRevoke) =
         ConsumerBuilder<_,_>(config.inner)
@@ -288,7 +300,7 @@ type ConsumerBuilder =
                 onRevoke |> Option.iter (fun f -> f xs))
             .SetOffsetsCommittedHandler(fun _c cos ->
                 for t,ps in cos.Offsets |> Seq.groupBy (fun p -> p.Topic) do
-                    let o = seq { for p in ps -> let pp = p.Partition in pp.Value, Impl.OffsetValue.ofOffset p.Offset(*, fmtError p.Error*) }
+                    let o = seq { for p in ps -> let pp = p.Partition in pp.Value, OffsetValue.ofOffset p.Offset(*, fmtError p.Error*) }
                     let e = cos.Error
                     if not e.IsError then log.Information("Consuming... Committed {topic} {offsets}", t, o)
                     else log.Warning("Consuming... Committed {topic} {offsets} reason={error} code={code} isBrokerError={isBrokerError}", t, o, e.Reason, e.Code, e.IsBrokerError))
@@ -410,11 +422,16 @@ module private ConsumerImpl =
 /// Conclusion of the processing (when a `partionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
 type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
 
-    let onAssigned = new Event<_>()
+    let onStopping, onAssigned, onRevoked = new Event<_>(), new Event<_>(), new Event<_>()
+
+    [<CLIEvent>] member __.OnStopping = onStopping.Publish
+    [<CLIEvent>] member __.OnAssigned = onAssigned.Publish
+    [<CLIEvent>] member __.OnRevoked = onRevoked.Publish
+    member private __.FireStopping() = onStopping.Trigger ()
+    member private __.FireAssigned args = onAssigned.Trigger args
+    member private __.FireRevoked args = onRevoked.Trigger args
 
     member __.Inner = inner
-    [<CLIEvent>]
-    member __.OnAssigned = onAssigned.Publish
 
     interface IDisposable with member __.Dispose() = __.Stop()
     /// Request cancellation of processing
@@ -428,50 +445,32 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
     /// Starts a Kafka consumer with the provided configuration. Batches are grouped by topic partition.
     /// Batches belonging to the same topic partition will be scheduled sequentially and monotonically; however batches from different partitions can run concurrently.
     /// Completion of the `partitionHandler` saves the attained offsets so the auto-commit can mark progress; yielding an exception terminates the processing
-    static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>, ?monitorConfig : KafkaMonitorConfig) =
+    static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>) =
         if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
         log.Information("Consuming... {broker} {topics} {groupId} autoOffsetReset={autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlight={maxInFlightGB:n1}GB maxBatchDelay={maxBatchDelay}s maxBatchSize={maxBatchSize}",
             config.inner.BootstrapServers, config.topics, config.inner.GroupId, (let x = config.inner.AutoOffsetReset in x.Value), config.inner.FetchMaxBytes,
             float config.buffering.maxInFlightBytes / 1024. / 1024. / 1024., (let t = config.buffering.maxBatchDelay in t.TotalSeconds), config.buffering.maxBatchSize)
         let partitionedCollection = new ConsumerImpl.PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>()
-        let onRevoke (xs : seq<TopicPartitionOffset>) = 
+        let mutable _onRevoke, _onAssign, _onStopping = None, None, None
+        let onAssign (xs : ResizeArray<TopicPartition>) = 
+            _onAssign |> Option.iter (fun f -> f xs)
+        let onRevoke (xs : ResizeArray<TopicPartitionOffset>) = 
             for x in xs do
                 partitionedCollection.Revoke(x.TopicPartition)
-        let mutable _onAssign, unsub = [], List.empty<IDisposable>
-        let onAssign =
-            match monitorConfig with
-            | None -> None
-            | Some _mc ->
-                Some (fun partitions -> match _onAssign with [] -> () | fs -> for f in fs do f partitions)
-        let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config, onRevoke = onRevoke, ?onAssign = onAssign)
+            _onRevoke |> Option.iter (fun f -> f xs)
+        let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config, onRevoke = onRevoke, onAssign = onAssign)
         let cts = new CancellationTokenSource()
         let triggerStop () =
-            _onAssign <- []
-            for x in unsub do
-                x.Dispose()
             log.Information("Consuming ... Stopping {name}", consumer.Name)
+            _onStopping |> Option.iter (fun f -> f ())
             cts.Cancel()
-        match monitorConfig with
-        | None -> ()
-        | Some mc ->
-            let acc = AdminClientConfig(config.inner)
-            let ac = AdminClientBuilder(acc).Build()
-            for t in config.topics do
-                let intervalMs = let t = mc.pollInterval in int t.TotalMilliseconds
-                let mon = Impl.Monitor(log, ac, consumer, t, consumer.Name, mc.maxFailCount, intervalMs, mc.windowSize)
-                _onAssign <- mon.OnAssigned :: _onAssign
-                let rec f () = async {
-                    try let! _ = mon.Pump in ()
-                    with e ->
-                        match mc.onFaulted with
-                        | Some f -> do! f e
-                        | None -> ()
-                    return! f () }
-                Async.Start(f (), cts.Token)
-                unsub <- mon.OnStatus.Subscribe mc.onStatus :: unsub
-        consumer.Subscribe config.topics
         let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionedCollection partitionHandler |> Async.StartAsTask
-        new BatchedConsumer(consumer, task, triggerStop)
+        let c = new BatchedConsumer(consumer, task, triggerStop)
+        _onStopping <- Some c.FireStopping
+        _onAssign <- Some c.FireAssigned
+        _onRevoke <- Some c.FireRevoked
+        consumer.Subscribe config.topics
+        c
 
     /// Starts a Kafka consumer instance that schedules handlers grouped by message key. Additionally accepts a global degreeOfParallelism parameter
     /// that controls the number of handlers running concurrently across partitions for the given consumer instance.

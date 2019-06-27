@@ -1,7 +1,7 @@
 module Jet.ConfluentKafka.FSharp.Integration.MonitorTests
 
 open Jet.ConfluentKafka.FSharp
-open Jet.ConfluentKafka.FSharp.Impl
+open Jet.ConfluentKafka.FSharp.MonitorImpl
 open Swensen.Unquote
 open Xunit
 

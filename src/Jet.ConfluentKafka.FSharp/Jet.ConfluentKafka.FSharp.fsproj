@@ -12,8 +12,8 @@
 
   <ItemGroup>
     <Compile Include="Infrastructure.fs" />
-    <Compile Include="Monitor.fs" />
     <Compile Include="ConfluentKafka.fs" />
+    <Compile Include="Monitor.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,3 +1,5 @@
+/// Implements a watchdog that can be used to have a service self-detect stalled consumers and/or consistently growing lags
+/// Adapted from https://github.com/linkedin/Burrow by @jgardella
 namespace Jet.ConfluentKafka.FSharp
 
 open Confluent.Kafka
@@ -10,7 +12,7 @@ type PartitionResult =
     | ErrorPartitionStalled of lag: int64 // check 2
     | Healthy
 
-module Impl =
+module MonitorImpl =
     module Map =
         let mergeChoice (f:'a -> Choice<'b * 'c, 'b, 'c> -> 'd) (map1:Map<'a, 'b>) (map2:Map<'a, 'c>) : Map<'a, 'd> =
           Set.union (map1 |> Seq.map (fun k -> k.Key) |> set) (map2 |> Seq.map (fun k -> k.Key) |> set)
@@ -63,80 +65,56 @@ module Impl =
 
     /// Operations for providing consumer progress information.
     module ConsumerInfo =
-        
+                
         /// Returns consumer progress information.
-        /// Passing empty set of partitions returns information for all partitions.
         /// Note that this does not join the group as a consumer instance
-        let progress (admin : IAdminClient, consumer:IConsumer<'k,'v>) (topic:string) (ps:int[]) = async {
-          let! topicPartitions =
-            if ps |> Array.isEmpty then
-              async {
-                let meta = admin.GetMetadata(topic, TimeSpan.FromSeconds 40.)
-                let meta = meta.Topics |> Seq.find(fun t -> t.Topic = topic)
-                return meta.Partitions |> Seq.map(fun p -> new TopicPartition(topic, new Partition(p.PartitionId))) }
-            else
-              async { return ps |> Seq.map(fun p -> new TopicPartition(topic,new Partition(p))) }
+        let progress (consumer:IConsumer<'k,'v>) (topic:string) (ps:int[]) = async {
+            let topicPartitions = ps |> Seq.map(fun p -> new TopicPartition(topic, Partition p))
 
-          let committedOffsets =
-            consumer.Committed(topicPartitions, TimeSpan.FromSeconds(20.))
-            |> Seq.sortBy(fun e -> let p = e.Partition in p.Value)
-            |> Seq.map(fun e -> let p = e.Partition in p.Value, e)
-            |> Map.ofSeq
+            let committedOffsets =
+                consumer.Committed(topicPartitions, TimeSpan.FromSeconds(20.))
+                |> Seq.sortBy(fun e -> let p = e.Partition in p.Value)
+                |> Seq.map(fun e -> let p = e.Partition in p.Value, e)
+                |> Map.ofSeq
+            let! watermarkOffsets =
+                topicPartitions
+                |> Seq.map(fun tp -> async {
+                    return let p = tp.Partition in p.Value, consumer.QueryWatermarkOffsets(tp, TimeSpan.FromSeconds 40.)} )
+                |> Async.Parallel
 
-          let! watermarkOffsets =
-            topicPartitions
-              |> Seq.map(fun tp -> async {
-                return let p = tp.Partition in p.Value, consumer.QueryWatermarkOffsets(tp, TimeSpan.FromSeconds 40.)}
-              )
-              |> Async.Parallel
+            let watermarkOffsets = watermarkOffsets |> Map.ofArray
 
-          let watermarkOffsets =
-            watermarkOffsets
-            |> Map.ofArray
+            let partitions =
+                (watermarkOffsets, committedOffsets)
+                ||> Map.mergeChoice (fun p -> function
+                    | Choice1Of3 (hwo,cOffset) ->
+                        let e,l,o = (let v = hwo.Low in v.Value),(let v = hwo.High in v.Value),let v = cOffset.Offset in v.Value
+                        // Consumer offset of (Invalid Offset -1001) indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
+                        let lag, lead =
+                          match o with
+                          | offset when offset = let v = Offset.Unset in v.Value -> l - e, 0L
+                          | _ -> l - o, o - e
+                        { partition = p ; consumerOffset = cOffset.Offset ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = lag ; lead = lead ; messageCount = l - e }
+                    | Choice2Of3 hwo ->
+                        // in the event there is no consumer offset present, lag should be calculated as high watermark minus earliest
+                        // this prevents artifically high lags for partitions with no consumer offsets
+                        let e,l = (let v = hwo.Low in v.Value),let v = hwo.High in v.Value
+                        { partition = p ; consumerOffset = Offset.Unset; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
+                        //failwithf "unable to find consumer offset for topic=%s partition=%i" topic p
+                    | Choice3Of3 o ->
+                        let invalid = Offset.Unset
+                        { partition = p ; consumerOffset = o.Offset ; earliestOffset = invalid ; highWatermarkOffset = invalid ; lag = invalid.Value ; lead = invalid.Value ; messageCount = -1L })
+                |> Seq.map (fun kvp -> kvp.Value)
+                |> Seq.toArray
 
-          let partitions =
-            (watermarkOffsets, committedOffsets)
-            ||> Map.mergeChoice (fun p -> function
-              | Choice1Of3 (hwo,cOffset) ->
-                let e,l,o = (let v = hwo.Low in v.Value),(let v = hwo.High in v.Value),let v = cOffset.Offset in v.Value
-                // Consumer offset of (Invalid Offset -1001) indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
-                let lag, lead =
-                  match o with
-                  | offset when offset = let v = Offset.Unset in v.Value -> l - e, 0L
-                  | _ -> l - o, o - e
-                { partition = p ; consumerOffset = cOffset.Offset ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = lag ; lead = lead ; messageCount = l - e }
-              | Choice2Of3 hwo ->
-                // in the event there is no consumer offset present, lag should be calculated as high watermark minus earliest
-                // this prevents artifically high lags for partitions with no consumer offsets
-                let e,l = (let v = hwo.Low in v.Value),let v = hwo.High in v.Value
-                { partition = p ; consumerOffset = Offset.Unset; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
-                //failwithf "unable to find consumer offset for topic=%s partition=%i" topic p
-              | Choice3Of3 o ->
-                let invalid = Offset.Unset
-                { partition = p ; consumerOffset = o.Offset ; earliestOffset = invalid ; highWatermarkOffset = invalid ; lag = invalid.Value ; lead = invalid.Value ; messageCount = -1L })
-            |> Seq.map (fun kvp -> kvp.Value)
-            |> Seq.toArray
-
-          return {
-            topic = topic ; group = consumer.Name ; partitions = partitions
-            totalLag = partitions |> Seq.sumBy (fun p -> p.lag)
-            minLead =
-              if partitions.Length > 0 then
-                partitions |> Seq.map (fun p -> p.lead) |> Seq.min
-              else let v = Offset.Unset in v.Value }}
+            return {
+                topic = topic ; group = consumer.Name ; partitions = partitions
+                totalLag = partitions |> Seq.sumBy (fun p -> p.lag)
+                minLead =
+                    if partitions.Length > 0 then
+                        partitions |> Seq.map (fun p -> p.lead) |> Seq.min
+                    else let v = Offset.Unset in v.Value } }
     
-    type OffsetValue =
-        | Unset
-        | Valid of offset: int64
-        static member ofOffset(offset : Offset) =
-            match offset.Value with
-            | _ when offset = Offset.Unset -> Unset
-            | valid -> Valid valid
-        override this.ToString() =
-            match this with
-            | Unset -> "Unset"
-            | Valid value -> value.ToString()
-
     type PartitionInfo =
         {   partition : int
             consumerOffset : OffsetValue
@@ -158,21 +136,20 @@ module Impl =
 
     // Naive insert and copy out buffer
     type private RingBuffer<'A> (capacity : int) =
-        let lockObj = obj()
-        let mutable head = 0
-        let mutable tail = -1
-        let mutable size = 0
         let buffer : 'A [] = Array.zeroCreate capacity
+        let mutable head,tail,size = 0,-1,0
 
-        let copy () =
-            let arr = Array.zeroCreate size
-            let mutable i = head
-            for x = 0 to size - 1 do
-                arr.[x] <- buffer.[i % capacity]
-                i <- i + 1
-            arr
+        member __.TryCopyFull() =
+            if size <> capacity then None
+            else
+                let arr = Array.zeroCreate size
+                let mutable i = head
+                for x = 0 to size - 1 do
+                    arr.[x] <- buffer.[i % capacity]
+                    i <- i + 1
+                Some arr
 
-        let add (x : 'A) =
+        member __.Add(x : 'A) =
             tail <- (tail + 1) % capacity
             buffer.[tail] <- x
             if (size < capacity) then
@@ -180,17 +157,10 @@ module Impl =
             else
                 head <- (head + 1) % capacity
 
-        member __.SafeTryFullClone() =
-            lock lockObj (fun () -> if size = capacity then copy() |> Some else None)
-
-        member __.SafeAdd (x : 'A) =
-            lock lockObj (fun _ -> add x)
-
-        member __.Reset () =
-            lock lockObj (fun _ ->
-                head <- 0
-                tail <- -1
-                size <- 0)
+        member __.Clear() =
+            head <- 0
+            tail <- -1
+            size <- 0
 
     module Rules =
 
@@ -263,97 +233,101 @@ module Impl =
             |> Seq.groupBy (fun p -> p.partition)
             |> Seq.map (fun (p, info) -> p, checkRulesForPartition (Array.ofSeq info))
 
-    module private Logging =
+    let topicPartitionIsForTopic (topic : string) (topicPartition : TopicPartition) =
+        topicPartition.Topic = topic
 
-        let logResults (log : ILogger) topic consumerGroup (partitionResults : (int * PartitionResult) seq) =
+    let private queryConsumerProgress (consumer : IConsumer<'k,'v>) (topic : string) = async {
+        let partitionIds = [| for t in consumer.Assignment do if topicPartitionIsForTopic topic t then yield let v = t.Partition in v.Value |] 
+        let! r = ConsumerInfo.progress consumer topic partitionIds
+        return createPartitionInfoList r }
+
+    let run (consumer : IConsumer<'k,'v> ) (intervalMs,windowSize) (topic : string) (group : string) (onQuery,onCheckFailed,onStatus) =
+        let getAssignedPartitions () = seq { for x in consumer.Assignment do if x.Topic = topic then yield let p = x.Partition in p.Value }
+        let mutable assignments = getAssignedPartitions() |> set
+        let mutable buffer = new RingBuffer<_>(assignments.Count*windowSize)
+        let resetBufferIfRebalanced =
+            let current = getAssignedPartitions() |> set
+            fun () ->
+                if current <> assignments then
+                    if current.Count = assignments.Count then buffer.Clear()
+                    else buffer <- new RingBuffer<_>(windowSize*current.Count)
+                    assignments <- current
+
+        let checkConsumerProgress () = async {
+            let! res = queryConsumerProgress consumer topic
+            onQuery res
+            buffer.Add res
+            match buffer.TryCopyFull() with
+            | None -> ()
+            | Some ci ->
+                let states = Rules.checkRulesForAllPartitions ci |> List.ofSeq
+                onStatus topic group states }
+
+        let rec loop failCount = async {
+            let! failCount = async {
+                try resetBufferIfRebalanced ()
+                    do! checkConsumerProgress()
+                    return 0
+                with exn ->
+                    let count' = failCount + 1
+                    onCheckFailed count' exn
+                    return count'
+            }
+            do! Async.Sleep intervalMs
+            return! loop failCount }
+        loop 0
+
+    module Logging =
+
+        let logResults (log : ILogger) topic group (partitionResults : (int * PartitionResult) seq) =
             let cat = function
                 | OkReachedZero | Healthy -> Choice1Of3 ()
                 | ErrorPartitionStalled _lag -> Choice2Of3 ()
                 | WarningLagIncreasing -> Choice3Of3 ()
             match partitionResults |> Seq.groupBy (snd >> cat) |> List.ofSeq with
-            | [ Choice1Of3 (), _ ] -> log.Information("Monitoring... {topic}/{groupId} Healthy", topic, consumerGroup)
+            | [ Choice1Of3 (), _ ] -> log.Information("Monitoring... {topic}/{group} Healthy", topic, group)
             | errs ->
                 for res in errs do
                     match res with
                     | Choice1Of3 (), _ -> ()
                     | Choice2Of3 (), errs ->
                         let lag = function (partitionId, ErrorPartitionStalled lag) -> Some (partitionId,lag) | x -> failwithf "mismapped %A" x
-                        log.Error("Monitoring... {topic}/{groupId} Stalled with backlogs on {@stalled} [(partition,lag)]", topic, consumerGroup, errs |> Seq.choose lag)
+                        log.Error("Monitoring... {topic}/{group} Stalled with backlogs on {@stalled} [(partition,lag)]", topic, group, errs |> Seq.choose lag)
                     | Choice3Of3 (), warns -> 
-                        log.Warning("Monitoring... {topic}/{groupId} Growing lags on {@partitionIds}", topic, consumerGroup, warns |> Seq.map fst)
+                        log.Warning("Monitoring... {topic}/{group} Growing lags on {@partitionIds}", topic, group, warns |> Seq.map fst)
 
-    let topicPartitionIsForTopic (topic : string) (topicPartition : TopicPartition) =
-        topicPartition.Topic = topic
+        let logLatest (logger : ILogger) (topic : string) (consumerGroup : string) (Window partitionInfos) =
+            let partitionOffsets =
+                partitionInfos
+                |> Seq.sortBy (fun p -> p.partition)
+                |> Seq.map (fun p -> p.partition, p.highWatermarkOffset, p.consumerOffset)
 
-    let private queryConsumerProgress (admin, consumer : IConsumer<'k,'v>) (topic : string) = async {
-        let partitionIds = [| for t in consumer.Assignment do if topicPartitionIsForTopic topic t then yield let v = t.Partition in v.Value |] 
-        let! r = ConsumerInfo.progress (admin,consumer) topic partitionIds
-        return createPartitionInfoList r }
+            let aggregateLag = partitionInfos |> Seq.sumBy (fun p -> p.lag)
 
-    let private logLatest (logger : ILogger) (topic : string) (consumerGroup : string) (Window partitionInfos) =
-        let partitionOffsets =
-            partitionInfos
-            |> Seq.sortBy (fun p -> p.partition)
-            |> Seq.map (fun p -> p.partition, p.highWatermarkOffset, p.consumerOffset)
+            logger.Information("Monitoring... {topic}/{consumerGroup} lag {lag} offsets {offsets}",
+                topic, consumerGroup, aggregateLag, partitionOffsets)
 
-        let aggregateLag = partitionInfos |> Seq.sumBy (fun p -> p.lag)
+        let logFailure (log : ILogger) (topic : string) (group : string) failCount exn =
+            log.Warning(exn, "Monitoring... {topic}/{group} Exception # {failCount}", topic, group, failCount)
 
-        logger.Information("Monitoring... {topic}/{consumerGroup} lag {lag} offsets {offsets}",
-            topic, consumerGroup, aggregateLag, partitionOffsets)
+type KafkaMonitor<'k,'v>(log : ILogger, ?interval, ?windowSize) =
+    let interval = let i = defaultArg interval (TimeSpan.FromSeconds 30.) in int i.TotalMilliseconds
+    let windowSize = defaultArg windowSize 60
+    let onStatus, onCheckFailed = new Event<_>(), new Event<_>()
+    [<CLIEvent>] member __.OnStatus = onStatus.Publish
+    [<CLIEvent>] member __.OnCheckFailed = onCheckFailed.Publish
 
-    let private monitor consumer (maxFailCount, sleepMs) (buffer : RingBuffer<_>) (logger : ILogger) (topic : string) (consumerGroup : string) onStatus =
-        let checkConsumerProgress () = async {
-            let! res = queryConsumerProgress consumer topic
-            buffer.SafeAdd res
-            logLatest logger topic consumerGroup res
-            match buffer.SafeTryFullClone() with
-            | None -> ()
-            | Some ci ->
-                let states = Rules.checkRulesForAllPartitions ci |> List.ofSeq
-                onStatus topic consumerGroup states }
+    member private __.Pump(consumer, topic, group) =
+        let onQuery res = 
+            MonitorImpl.Logging.logLatest log topic group res
+        let onStatus topic group xs =
+            MonitorImpl.Logging.logResults log topic group xs
+            onStatus.Trigger(topic, xs)
+        let onCheckFailed count exn =
+            MonitorImpl.Logging.logFailure log topic group count exn
+            onCheckFailed.Trigger(topic, count, exn)
+        MonitorImpl.run consumer (interval,windowSize) topic group (onQuery,onCheckFailed,onStatus)
 
-        let rec loop failCount = async {
-            let! failCount = async {
-                try do! checkConsumerProgress()
-                    return 0
-                with exn ->
-                    logger.Warning(exn, "Monitoring... {topic}/{consumerGroup} Exception # {failCount}", topic, consumerGroup, failCount)
-                    if failCount >= maxFailCount then
-                        return raise exn
-                    return failCount + 1
-            }
-            do! Async.Sleep sleepMs
-            return! loop failCount }
-        loop 0
-
-    type Monitor<'k,'v>(log : ILogger, admin, consumer : IConsumer<'k,'v>, topic, consumerGroup, maxFailCount, intervalMs, windowSize) =
-        let ringBuffer = new RingBuffer<_>(windowSize)
-
-        let onStatus = new Event<_>()
-        [<CLIEvent>]
-        member __.OnStatus = onStatus.Publish
-
-        member __.OnAssigned topicPartitions =
-            // Reset the ring buffer for this topic if there's a rebalance for the topic.
-            if topicPartitions |> Seq.exists (topicPartitionIsForTopic topic) then
-                ringBuffer.Reset()
-
-        member __.Pump =
-            let onStatus topic group xs =
-                onStatus.Trigger xs
-                Logging.logResults log topic group xs
-            monitor (admin, consumer) (maxFailCount, intervalMs) ringBuffer log topic consumerGroup onStatus
-
-[<NoComparison; NoEquality>]
-type KafkaMonitorConfig =
-    {   maxFailCount : int
-        pollInterval : TimeSpan
-        windowSize : int
-        onStatus : (int * PartitionResult) list -> unit
-        onFaulted : (exn -> Async<unit>) option } with
-    static member Create(?onStatus, ?maxFailCount, ?pollInterval, ?windowSize, ?onFaulted) =
-        {    pollInterval = defaultArg pollInterval (TimeSpan.FromSeconds 30.)
-             windowSize = defaultArg windowSize 60
-             maxFailCount = defaultArg maxFailCount 3
-             onStatus = defaultArg onStatus ignore
-             onFaulted = onFaulted }
+    member __.StartAsChild(target : IConsumer<'k,'v>, group) = async {
+        for topic in target.Subscription do
+            let! _ = Async.StartChild(__.Pump(target, topic, group)) in () }
