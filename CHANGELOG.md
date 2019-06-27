@@ -11,7 +11,10 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 ### Changed
 
-- Added `Producing... ` prefix to log messages for consistency
+- Added `Producing...` prefix to log messages for consistency
+- Made `Consuming...` prefixes for log messages consistent
+- Tidied logging of `Unset` values in `Consuming... Committed` messsage
+- `ConsumerBuilder.WithLogging` signature change (NB breaking vs `1.0.1`, affects users of [Propulsion libraries](https://github.com/jet/propulsion) only)
 
 ### Removed
 ### Fixed

@@ -1,8 +1,8 @@
 namespace Jet.ConfluentKafka.FSharp
 
 open Confluent.Kafka
-open Newtonsoft.Json.Linq
 open Newtonsoft.Json
+open Newtonsoft.Json.Linq
 open Serilog
 open System
 open System.Collections.Concurrent
@@ -262,43 +262,51 @@ type KafkaPartitionMetrics =
         [<JsonProperty("consumer_lag")>]
         consumerLag: int64 }        
 
+type OffsetValue =
+    | Unset
+    | Valid of value: int64
+    static member ofOffset(offset : Offset) =
+        match offset.Value with
+        | _ when offset = Offset.Unset -> Unset
+        | valid -> Valid valid
+    override this.ToString() =
+        match this with
+        | Unset -> "Unset"
+        | Valid value -> value.ToString()
+
 type ConsumerBuilder =
-    static member WithLogging(log : ILogger, config, ?onRevoke) =
-        if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
-        let consumer =
-            ConsumerBuilder<_,_>(config.inner)
-                .SetLogHandler(fun _c m -> log.Information("Consuming... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
-                .SetErrorHandler(fun _c e -> log.Error("Consuming... Error reason={reason} code={code} broker={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
-                .SetStatisticsHandler(fun _c json -> 
-                    // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
-                    let stats = JToken.Parse json
-                    for t in stats.Item("topics").Children() do
-                        if t.HasValues && config.topics |> Seq.exists (fun ct -> ct = t.First.Item("topic").ToString()) then
-                            let topic, partitions = let tm = t.First in tm.Item("topic").ToString(), tm.Item("partitions").Children()
-                            let metrics = [|
-                                for tm in partitions do
-                                    if tm.HasValues then
-                                        let kpm = tm.First.ToObject<KafkaPartitionMetrics>()
-                                        if kpm.partition <> -1 then
-                                            yield kpm |]
-                            let totalLag = metrics |> Array.sumBy (fun x -> x.consumerLag)
-                            log.Information("Consuming... Stats {topic:l} totalLag {totalLag} {@stats}", topic, totalLag, metrics))
-                .SetPartitionsAssignedHandler(fun _c xs ->
-                    for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
-                        log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions))
-                .SetPartitionsRevokedHandler(fun _c xs ->
-                    for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
-                        log.Information("Consuming... Revoked {topic:l} {partitions}", topic, partitions)
-                    onRevoke |> Option.iter (fun f -> f xs))
-                .SetOffsetsCommittedHandler(fun _c cos ->
-                    for t,ps in cos.Offsets |> Seq.groupBy (fun p -> p.Topic) do
-                        let o = [for p in ps -> let pp = p.Partition in pp.Value, let o = p.Offset in if o.IsSpecial then box (string o) else box o.Value(*, fmtError p.Error*)]
-                        let e = cos.Error
-                        if not e.IsError then log.Information("Consuming... Committed {topic} {@offsets}", t, o)
-                        else log.Warning("Consuming... Committed {topic} {@offsets} reason={error} code={code} isBrokerError={isBrokerError}", t, o, e.Reason, e.Code, e.IsBrokerError))
-                .Build()
-        consumer.Subscribe config.topics
-        consumer
+    static member WithLogging(log : ILogger, config : ConsumerConfig, ?onRevoke) =
+        ConsumerBuilder<_,_>(config)
+            .SetLogHandler(fun _c m -> log.Information("Consuming... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
+            .SetErrorHandler(fun _c e -> log.Error("Consuming... Error reason={reason} code={code} broker={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
+            .SetStatisticsHandler(fun c json -> 
+                // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
+                let stats = JToken.Parse json
+                for t in stats.Item("topics").Children() do
+                    if t.HasValues && c.Subscription |> Seq.exists (fun ct -> ct = t.First.Item("topic").ToString()) then
+                        let topic, partitions = let tm = t.First in tm.Item("topic").ToString(), tm.Item("partitions").Children()
+                        let metrics = [|
+                            for tm in partitions do
+                                if tm.HasValues then
+                                    let kpm = tm.First.ToObject<KafkaPartitionMetrics>()
+                                    if kpm.partition <> -1 then
+                                        yield kpm |]
+                        let totalLag = metrics |> Array.sumBy (fun x -> x.consumerLag)
+                        log.Information("Consuming... Stats {topic:l} totalLag {totalLag} {@stats}", topic, totalLag, metrics))
+            .SetPartitionsAssignedHandler(fun _c xs ->
+                for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
+                    log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions))
+            .SetPartitionsRevokedHandler(fun _c xs ->
+                for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
+                    log.Information("Consuming... Revoked {topic:l} {partitions}", topic, partitions)
+                onRevoke |> Option.iter (fun f -> f xs))
+            .SetOffsetsCommittedHandler(fun _c cos ->
+                for t,ps in cos.Offsets |> Seq.groupBy (fun p -> p.Topic) do
+                    let o = seq { for p in ps -> let pp = p.Partition in pp.Value, OffsetValue.ofOffset p.Offset(*, fmtError p.Error*) }
+                    let e = cos.Error
+                    if not e.IsError then log.Information("Consuming... Committed {topic} {offsets}", t, o)
+                    else log.Warning("Consuming... Committed {topic} {offsets} reason={error} code={code} isBrokerError={isBrokerError}", t, o, e.Reason, e.Code, e.IsBrokerError))
+            .Build()
 
 module private ConsumerImpl =
     /// guesstimate approximate message size in bytes
@@ -402,7 +410,7 @@ module private ConsumerImpl =
                     if message <> null then
                         counter.Delta(+approximateMessageBytes message)
                         partitionedCollection.Add(message.TopicPartition, message)
-                with| :? ConsumeException as e -> log.Warning(e, "Consuming ... exception {name}", consumer.Name)
+                with| :? ConsumeException as e -> log.Warning(e, "Consuming... exception {name}", consumer.Name)
                     | :? System.OperationCanceledException -> log.Warning("Consuming... cancelled {name}", consumer.Name)
         finally
             consumer.Close()
@@ -414,15 +422,13 @@ module private ConsumerImpl =
 /// Creates and wraps a Confluent.Kafka IConsumer, wrapping it to afford a batched consumption mode with implicit offset progression at the end of each
 /// (parallel across partitions, sequenced/monotinic within) batch of processing carried out by the `partitionHandler`
 /// Conclusion of the processing (when a `partionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
-type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, task : Task<unit>, cts : CancellationTokenSource) =
+type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
 
     member __.Inner = inner
 
     interface IDisposable with member __.Dispose() = __.Stop()
     /// Request cancellation of processing
-    member __.Stop() =  
-        log.Information("Consuming ... Stopping {name}", inner.Name)
-        cts.Cancel()
+    member __.Stop() =  triggerStop ()
     /// Inspects current status of processing task
     member __.Status = task.Status
     member __.RanToCompletion = task.Status = System.Threading.Tasks.TaskStatus.RanToCompletion 
@@ -441,10 +447,15 @@ type BatchedConsumer private (log : ILogger, inner : IConsumer<string, string>, 
         let onRevoke (xs : seq<TopicPartitionOffset>) = 
             for x in xs do
                 partitionedCollection.Revoke(x.TopicPartition)
-        let consumer = ConsumerBuilder.WithLogging(log, config, onRevoke = onRevoke)
+        let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config.inner, onRevoke = onRevoke)
         let cts = new CancellationTokenSource()
+        let triggerStop () =
+            log.Information("Consuming... Stopping {name}", consumer.Name)
+            cts.Cancel()
         let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionedCollection partitionHandler |> Async.StartAsTask
-        new BatchedConsumer(log, consumer, task, cts)
+        let c = new BatchedConsumer(consumer, task, triggerStop)
+        consumer.Subscribe config.topics
+        c
 
     /// Starts a Kafka consumer instance that schedules handlers grouped by message key. Additionally accepts a global degreeOfParallelism parameter
     /// that controls the number of handlers running concurrently across partitions for the given consumer instance.

@@ -29,6 +29,7 @@ module Helpers =
 
     let createLogger sink =
         LoggerConfiguration()
+            .Destructure.FSharpTypes()
             .WriteTo.Sink(sink)
             .WriteTo.Seq("http://localhost:5341")
             .CreateLogger()
@@ -41,17 +42,15 @@ module Helpers =
     let newId () = let g = System.Guid.NewGuid() in g.ToString("N")
 
     type Async with
-        static member ParallelThrottled degreeOfParallelism jobs = async {
+        static member ParallelThrottled degreeOfParallelism jobs =
             let s = new SemaphoreSlim(degreeOfParallelism)
-            return!
-                jobs
-                |> Seq.map (fun j -> async {
-                    let! ct = Async.CancellationToken
-                    do! s.WaitAsync ct |> Async.AwaitTask
-                    try return! j
-                    finally s.Release() |> ignore })
-                |> Async.Parallel
-        }
+            jobs
+            |> Seq.map (fun j -> async {
+                let! ct = Async.CancellationToken
+                do! s.WaitAsync ct |> Async.AwaitTask
+                try return! j
+                finally s.Release() |> ignore })
+            |> Async.Parallel
 
     type BatchedConsumer with
         member c.StopAfter(delay : TimeSpan) =
@@ -73,7 +72,6 @@ module Helpers =
                     let key = string msgId
                     let value = JsonConvert.SerializeObject { producerId = producerId ; messageId = msgId }
                     key, value)
-
                 |> Seq.chunkBySize 100
                 |> Seq.map producer.ProduceBatch
                 |> Async.ParallelThrottled 7
@@ -88,8 +86,7 @@ module Helpers =
         let mkConsumer (consumerId : int) = async {
             let deserialize (msg : ConsumeResult<_,_>) = { consumerId = consumerId ; message = msg ; payload = JsonConvert.DeserializeObject<_> msg.Value }
 
-            // need to pass the consumer instance to the handler callback
-            // do a bit of cyclic dependency fixups
+            // need to pass the consumer instance to the handler callback; perform some cyclic dependency fixups
             let consumerCell = ref None
             let rec getConsumer() =
                 // avoid potential race conditions by polling
@@ -140,9 +137,7 @@ type T1(testOutputHelper) =
         let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId, statisticsInterval=(TimeSpan.FromSeconds 5.))
         let consumers = runConsumers log config numConsumers None consumerCallback
 
-        do! [ producers ; consumers ]
-            |> Async.Parallel
-            |> Async.Ignore
+        let! _ = [ producers ; consumers ] |> Async.Parallel
 
         // Section: assertion checks
         let ``consumed batches should be non-empty`` =
