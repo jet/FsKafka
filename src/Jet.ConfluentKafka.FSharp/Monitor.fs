@@ -246,7 +246,7 @@ module MonitorImpl =
         let! r = ConsumerInfo.progress consumer topic partitionIds
         return createPartitionInfoList r }
 
-    let run (consumer : IConsumer<'k,'v> ) (intervalMs,windowSize) (topic : string) (group : string) (onQuery,onCheckFailed,onStatus) =
+    let run (consumer : IConsumer<'k,'v> ) (intervalMs,windowSize,failResetCount) (topic : string) (group : string) (onQuery,onCheckFailed,onStatus) =
         let getAssignedPartitions () = seq { for x in consumer.Assignment do if x.Topic = topic then yield let p = x.Partition in p.Value }
         let mutable assignments = getAssignedPartitions() |> set
         let mutable buffer = new RingBuffer<_>(assignments.Count*windowSize)
@@ -275,6 +275,9 @@ module MonitorImpl =
                     return 0
                 with exn ->
                     let count' = failCount + 1
+                    // If it's been too long since we've successfully obtained a reading, discard preceding values to avoid false positives e.g. re stalled consumers
+                    if count' = failResetCount then
+                        buffer.Clear()
                     onCheckFailed count' exn
                     return count'
             }
@@ -315,13 +318,30 @@ module MonitorImpl =
         let logFailure (log : ILogger) (topic : string) (group : string) failCount exn =
             log.Warning(exn, "Monitoring... {topic}/{group} Exception # {failCount}", topic, group, failCount)
 
-type KafkaMonitor<'k,'v>(log : ILogger, ?interval, ?windowSize) =
+/// Used to manage a set of bacground tasks that perdically (based on `interval`) grab the broker's recorded high/low watermarks
+/// and then map that to a per-partition status for each partition that the consumer being observed has been assigned
+type KafkaMonitor<'k,'v>
+    (   log : ILogger,
+        /// Interval between checks of high/low watermarks. Default 30s
+        ?interval,
+        /// Number if readings per partition to use in order to make inferences. Default 10 (at default interval of 30s, implies a 5m window).
+        ?windowSize,
+        /// Number of failed calls to broker that should trigger discarding of buffered readings in order to avoid false positives. Default 3.
+        ?failResetCount) =
+    let failResetCount = defaultArg failResetCount 3
     let interval = let i = defaultArg interval (TimeSpan.FromSeconds 30.) in int i.TotalMilliseconds
-    let windowSize = defaultArg windowSize 25
-    let onStatus, onCheckFailed = new Event<_>(), new Event<_>()
+    let windowSize = defaultArg windowSize 10
+    let onStatus, onCheckFailed = new Event<string*(int *PartitionResult) list>(), new Event<string*int*exn>()
+
+    /// Periodically supplies the status for all assigned partitions (whenever we've gathered `windowSize` of readings)
+    /// Subscriber can e.g. use this to force a consumer restart if no progress is being made
     [<CLIEvent>] member __.OnStatus = onStatus.Publish
+
+    /// Raised whenever call to broker to ascertain watermarks has failed
+    /// Subscriber can e.g. raise an alert if enough consecutive failures have occurred
     [<CLIEvent>] member __.OnCheckFailed = onCheckFailed.Publish
 
+    // One of these runs per topic
     member private __.Pump(consumer, topic, group) =
         let onQuery res = 
             MonitorImpl.Logging.logLatest log topic group res
@@ -331,8 +351,9 @@ type KafkaMonitor<'k,'v>(log : ILogger, ?interval, ?windowSize) =
         let onCheckFailed count exn =
             MonitorImpl.Logging.logFailure log topic group count exn
             onCheckFailed.Trigger(topic, count, exn)
-        MonitorImpl.run consumer (interval,windowSize) topic group (onQuery,onCheckFailed,onStatus)
+        MonitorImpl.run consumer (interval,windowSize,failResetCount) topic group (onQuery,onCheckFailed,onStatus)
 
+    /// Commences a child task per subscribed topic that will ob
     member __.StartAsChild(target : IConsumer<'k,'v>, group) = async {
         for topic in target.Subscription do
             let! _ = Async.StartChild(__.Pump(target, topic, group)) in () }
