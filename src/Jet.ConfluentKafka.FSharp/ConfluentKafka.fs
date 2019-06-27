@@ -272,7 +272,7 @@ type OffsetValue =
         | Valid value -> value.ToString()
 
 type ConsumerBuilder =
-    static member WithLogging(log : ILogger, config, ?onAssign, ?onRevoke) =
+    static member WithLogging(log : ILogger, config, ?onRevoke) =
         ConsumerBuilder<_,_>(config.inner)
             .SetLogHandler(fun _c m -> log.Information("Consuming... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
             .SetErrorHandler(fun _c e -> log.Error("Consuming... Error reason={reason} code={code} broker={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
@@ -292,8 +292,7 @@ type ConsumerBuilder =
                         log.Information("Consuming... Stats {topic:l} totalLag {totalLag} {@stats}", topic, totalLag, metrics))
             .SetPartitionsAssignedHandler(fun _c xs ->
                 for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
-                    log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions)
-                onAssign |> Option.iter (fun f -> f xs))
+                    log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions))
             .SetPartitionsRevokedHandler(fun _c xs ->
                 for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
                     log.Information("Consuming... Revoked {topic:l} {partitions}", topic, partitions)
@@ -422,15 +421,6 @@ module private ConsumerImpl =
 /// Conclusion of the processing (when a `partionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
 type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
 
-    let onStopping, onAssigned, onRevoked = new Event<_>(), new Event<_>(), new Event<_>()
-
-    [<CLIEvent>] member __.OnStopping = onStopping.Publish
-    [<CLIEvent>] member __.OnAssigned = onAssigned.Publish
-    [<CLIEvent>] member __.OnRevoked = onRevoked.Publish
-    member private __.FireStopping() = onStopping.Trigger ()
-    member private __.FireAssigned args = onAssigned.Trigger args
-    member private __.FireRevoked args = onRevoked.Trigger args
-
     member __.Inner = inner
 
     interface IDisposable with member __.Dispose() = __.Stop()
@@ -451,24 +441,16 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
             config.inner.BootstrapServers, config.topics, config.inner.GroupId, (let x = config.inner.AutoOffsetReset in x.Value), config.inner.FetchMaxBytes,
             float config.buffering.maxInFlightBytes / 1024. / 1024. / 1024., (let t = config.buffering.maxBatchDelay in t.TotalSeconds), config.buffering.maxBatchSize)
         let partitionedCollection = new ConsumerImpl.PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>()
-        let mutable _onRevoke, _onAssign, _onStopping = None, None, None
-        let onAssign (xs : ResizeArray<TopicPartition>) = 
-            _onAssign |> Option.iter (fun f -> f xs)
         let onRevoke (xs : ResizeArray<TopicPartitionOffset>) = 
             for x in xs do
                 partitionedCollection.Revoke(x.TopicPartition)
-            _onRevoke |> Option.iter (fun f -> f xs)
-        let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config, onRevoke = onRevoke, onAssign = onAssign)
+        let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config, onRevoke = onRevoke)
         let cts = new CancellationTokenSource()
         let triggerStop () =
             log.Information("Consuming ... Stopping {name}", consumer.Name)
-            _onStopping |> Option.iter (fun f -> f ())
             cts.Cancel()
         let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionedCollection partitionHandler |> Async.StartAsTask
         let c = new BatchedConsumer(consumer, task, triggerStop)
-        _onStopping <- Some c.FireStopping
-        _onAssign <- Some c.FireAssigned
-        _onRevoke <- Some c.FireRevoked
         consumer.Subscribe config.topics
         c
 

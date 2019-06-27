@@ -9,9 +9,12 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- `KafkaMonitor` based on [Burrow](https://github.com/linkedin/Burrow) @jgardella
+
 ### Changed
 
-- Added `Producing... ` prefix to log messages for conistency
+- Added `Producing... ` prefix to log messages for consistency
 
 ### Removed
 ### Fixed

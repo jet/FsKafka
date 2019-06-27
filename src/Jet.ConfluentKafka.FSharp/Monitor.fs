@@ -13,6 +13,11 @@ type PartitionResult =
     | Healthy
 
 module MonitorImpl =
+#if NET461
+    module Array =
+        let head xs = Seq.head xs
+        let last xs = Seq.last xs
+#endif
     module Map =
         let mergeChoice (f:'a -> Choice<'b * 'c, 'b, 'c> -> 'd) (map1:Map<'a, 'b>) (map2:Map<'a, 'c>) : Map<'a, 'd> =
           Set.union (map1 |> Seq.map (fun k -> k.Key) |> set) (map2 |> Seq.map (fun k -> k.Key) |> set)
@@ -245,13 +250,13 @@ module MonitorImpl =
         let getAssignedPartitions () = seq { for x in consumer.Assignment do if x.Topic = topic then yield let p = x.Partition in p.Value }
         let mutable assignments = getAssignedPartitions() |> set
         let mutable buffer = new RingBuffer<_>(assignments.Count*windowSize)
-        let resetBufferIfRebalanced =
+        let validateAssignments () =
             let current = getAssignedPartitions() |> set
-            fun () ->
-                if current <> assignments then
-                    if current.Count = assignments.Count then buffer.Clear()
-                    else buffer <- new RingBuffer<_>(windowSize*current.Count)
-                    assignments <- current
+            if current <> assignments then
+                if current.Count = assignments.Count then buffer.Clear()
+                else buffer <- new RingBuffer<_>(windowSize*current.Count)
+                assignments <- current
+            assignments.Count <> 0
 
         let checkConsumerProgress () = async {
             let! res = queryConsumerProgress consumer topic
@@ -265,8 +270,8 @@ module MonitorImpl =
 
         let rec loop failCount = async {
             let! failCount = async {
-                try resetBufferIfRebalanced ()
-                    do! checkConsumerProgress()
+                try if validateAssignments () then
+                        do! checkConsumerProgress()
                     return 0
                 with exn ->
                     let count' = failCount + 1
@@ -312,7 +317,7 @@ module MonitorImpl =
 
 type KafkaMonitor<'k,'v>(log : ILogger, ?interval, ?windowSize) =
     let interval = let i = defaultArg interval (TimeSpan.FromSeconds 30.) in int i.TotalMilliseconds
-    let windowSize = defaultArg windowSize 60
+    let windowSize = defaultArg windowSize 25
     let onStatus, onCheckFailed = new Event<_>(), new Event<_>()
     [<CLIEvent>] member __.OnStatus = onStatus.Publish
     [<CLIEvent>] member __.OnCheckFailed = onCheckFailed.Publish

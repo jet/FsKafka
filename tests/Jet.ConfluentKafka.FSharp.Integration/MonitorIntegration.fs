@@ -8,7 +8,6 @@ open System.Threading
 open Swensen.Unquote
 
 let mkGuid () = let g = System.Guid.NewGuid() in g.ToString("N")
-let mkMonitor log = KafkaMonitor(log, TimeSpan.FromSeconds 3., windowSize = 5)
 let mkProducer log broker topic =
     // Needs to be random to fill al partitions
     let config = KafkaProducerConfig.Create("tiger", broker, Acks.Leader, partitioner = Partitioner.Random)
@@ -19,13 +18,16 @@ let startConsumerFromConfig log config handler =
     BatchedConsumer.Start(log, config, handler)
 let startConsumer log broker topic groupId handler =
     let config = createConsumerConfig broker topic groupId
-    BatchedConsumer.Start(log, config, handler)
+    startConsumerFromConfig log config handler
+let mkMonitor log = KafkaMonitor(log, TimeSpan.FromSeconds 3., windowSize = 5)
+
 let producerOnePerSecondLoop (producer : KafkaProducer) =
     let rec loop () = async {
         let! _ = producer.ProduceAsync("a","1")
         do! Async.Sleep 1000
         return! loop () }
     loop ()
+
 let onlyConsumeFirstBatchHandler =
     let observedPartitions = System.Collections.Concurrent.ConcurrentDictionary()
     fun (items : ConsumeResult<string,string>[]) -> async {
