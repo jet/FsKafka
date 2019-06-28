@@ -10,6 +10,13 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+### Removed
+### Fixed
+
+<a name="1.1.0"></a>
+## [1.1.0] - 2019-06-28
+
+### Changed
 
 - Targets `Confluent.Kafka` v `1.1.0`, `librdkafka.redist` v `1.1.0` [#42](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/42)
 - Added `Producing...` prefix to log messages for consistency
@@ -17,7 +24,6 @@ The `Unreleased` section name is replaced by the expected version of next releas
 - Tidied logging of `Unset` values in `Consuming... Committed` messsage
 - `ConsumerBuilder.WithLogging` signature change (NB breaking vs `1.0.1`, affects users of [Propulsion libraries](https://github.com/jet/propulsion) only)
 
-### Removed
 ### Fixed
 
 - Fixed and clarified defaulting behavior for `fetchMaxBytes`,`maxInFlight`,`partitioner` arguments [#40](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/40)
@@ -201,7 +207,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.1...HEAD
+[Unreleased]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.1-rc1...1.0.1
 [1.0.1-rc1]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.0-rc13...1.0.1-rc1
 [1.0.0-rc14]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.0-rc13...1.0.0-rc14
