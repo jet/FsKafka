@@ -265,14 +265,16 @@ type KafkaPartitionMetrics =
 type OffsetValue =
     | Unset
     | Valid of value: int64
-    static member ofOffset(offset : Offset) =
-        match offset.Value with
-        | _ when offset = Offset.Unset -> Unset
-        | valid -> Valid valid
     override this.ToString() =
         match this with
         | Unset -> "Unset"
         | Valid value -> value.ToString()
+[<AutoOpen>]
+module OffsetValue =
+    let ofOffset (offset : Offset) =
+        match offset.Value with
+        | _ when offset = Offset.Unset -> Unset
+        | valid -> Valid valid
 
 type ConsumerBuilder =
     static member WithLogging(log : ILogger, config : ConsumerConfig, ?onRevoke) =
