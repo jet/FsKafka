@@ -1,8 +1,6 @@
 # Jet.ConfluentKafka.FSharp 1.x [![Build Status](https://dev.azure.com/jet-opensource/opensource/_apis/build/status/jet.Jet.ConfluentKafka.FSharp)](https://dev.azure.com/jet-opensource/opensource/_build/latest?definitionId=7) [![release](https://img.shields.io/github/release/jet/Jet.ConfluentKafka.FSharp.svg)](https://github.com/jet/Jet.ConfluentKafka.FSharp/releases) [![NuGet](https://img.shields.io/nuget/v/Jet.ConfluentKafka.FSharp.svg?logo=nuget)](https://www.nuget.org/packages/Jet.ConfluentKafka.FSharp/) [![license](https://img.shields.io/github/license/jet/Jet.ConfluentKafka.FSharp.svg)](LICENSE) ![code size](https://img.shields.io/github/languages/code-size/jet/Jet.ConfluentKafka.FSharp.svg)
 
-F# friendly wrapper for `Confluent.Kafka` versions `>= 1.0.0`, with minimal dependencies or additional abstractions.
-
-**See also: [`v0` branch](https://github.com/jet/Jet.ConfluentKafka.FSharp/tree/v0), which targets `Confluent.Kafka` versions `0.11.*` and is designed for compatibility with the [Kafunk](https://github.com/jet/kafunk) API.**
+F# friendly wrapper for `Confluent.Kafka` versions `>= 1.1.0`, with minimal dependencies or additional abstractions.
 
 ## Components
 
@@ -13,7 +11,7 @@ The components within this repository are delivered as a multi-targeted Nuget pa
 ## Related repos
 
 - See [the Propulsion repo](https://github.com/jet/propulsion) for extended Producers and Consumers.
-- See [the Jet `dotnet new` templates repo](https://github.com/jet/dotnet-templates)'s `eqxprojector` template (in `-k` mode) for example producer/consumer logic using the `BatchedProducer` and `BatchedConsumer` from `Jet.ConfluentKafka.FSharp`, alongside the extended modes in `Propulsion`.
+- See [the Jet `dotnet new` templates repo](https://github.com/jet/dotnet-templates)'s `proProjector` template (in `-k` mode) for example producer logic using the `BatchedProducer` and the `proConsumer` template for examples of using the `BatchedConsumer` from `Jet.ConfluentKafka.FSharp`, alongside the extended modes in `Propulsion`.
 - See [the Equinox QuickStart](https://github.com/jet/equinox#quickstart) for examples of using this library to project to Kafka from `Equinox.Cosmos` and/or `Equinox.EventStore`.
 
 ## CONTRIBUTING
@@ -70,9 +68,7 @@ Equinox places some key constraints on all components and dependencies:-
 - aim to add any resilience features as patches to upstream repos
 - thorough test coverage; integration coverage for core wrapped functionality, unit tests for any non-trivial logic in the wrapper library 
 
-You can see [the development process history here](https://github.com/jet/equinox/pull/87). The base code originates from Jet's Inventory Management System (at the point it was taken, it worked against `Confluent.Kafka` v `0.11.4`**)
-
-In addition to being used in the [`dotnet new eqxprojector -k` template](https://github.com/jet/dotnet-templates/tree/master/equinox-projector), there are at least two Jet teams using it independent of that.
+You can see [the development process history here](https://github.com/jet/equinox/pull/87). The base code originates from Jet's Inventory Management System (at the point it was taken, it worked against `Confluent.Kafka` v `0.11.4`)
 
 ### What is Kafunk ?
 
@@ -80,11 +76,11 @@ In addition to being used in the [`dotnet new eqxprojector -k` template](https:/
 
 ### What about `jet-confluent-kafka` and `Confluent.Kafka` v `0.11.4` support?
 
-The [`v0` branch](tree/v0) continues to house the original code as previously borne by the `master` of this repo. It's not going anywhere, especially while we have a significant number of `Confluent.Kafka` v `0.11.x` based clients in use across our systems.
+The [`v0` branch](tree/v0) continues to house the original code as previously borne by the `master` of this repo
 
 - It will continue to address the need to provide an easy migration from the Kafunk API
-- There are significant non-trivial changes in lifetime management in the `RdKafka` drivers accompanying `0.11.5` and `0.11.6` (with potential behavioral changes implied too). While upgrading may be achievable without API changes, it does bring into play a series of changes related to how the `rdkafka` driver closes connections (which can result in long days chasing `AccessViolationException` and friends)
-- **NB Experience of [the changes necessary to accommodate the sweeping changes that the `Confluent.Kafka` v `1.0.0` API brings when compared to the `0.11.x` codebase](https://github.com/jet/equinox/pull/87) suggests it's likely to be a significant undertaking to adjust the `v0` branch to target `Confluent.Kafka` v `>= 1.0.0` without significant surface API changes; there is no current plan to introduce such changes**
+- There are significant non-trivial changes in lifetime management in the `librdafka` drivers accompanying `0.11.5` and `0.11.6` (with potential behavioral changes implied too). While upgrading may be achievable without API changes, it does bring into play a series of changes related to how the `rdkafka` driver closes connections (which can result in long days chasing `AccessViolationException` and friends)
+- **NB Experience of [the changes necessary to accommodate the sweeping changes that the `Confluent.Kafka` v `1.0.0` API brings when compared to the `0.11.x` codebase](https://github.com/jet/equinox/pull/87) suggests it's likely to be a significant undertaking to adjust the `v0` branch to target `Confluent.Kafka` v `>= 1.0.0` without significant surface API changes (TL;DR [there are no more events, you need to wire everything up in the Builder](https://github.com/confluentinc/confluent-kafka-dotnet/issues/994)); there is absolutely no plan or resourcing to introduce such changes on the `v0` branch; the suggested upgrade path is using the shims in `Propulsion.Kafka0` in order to do an incremental switch-over to v1**
 
 ### Whats's involved in migrating from `Jet.ConfluentKafka.fsharp 0.9.x` to `Jet.ConfluentKafka.FSharp 1.0.x` ?
 
