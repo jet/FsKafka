@@ -1,6 +1,6 @@
 # Jet.ConfluentKafka.FSharp [![Build Status](https://dev.azure.com/jet-opensource/opensource/_apis/build/status/jet.Jet.ConfluentKafka.FSharp)](https://dev.azure.com/jet-opensource/opensource/_build/latest?definitionId=7) [![release](https://img.shields.io/github/release/jet/Jet.ConfluentKafka.FSharp.svg)](https://github.com/jet/Jet.ConfluentKafka.FSharp/releases) [![NuGet](https://img.shields.io/nuget/v/Jet.ConfluentKafka.FSharp.svg?logo=nuget)](https://www.nuget.org/packages/Jet.ConfluentKafka.FSharp/) [![license](https://img.shields.io/github/license/jet/Jet.ConfluentKafka.FSharp.svg)](LICENSE) ![code size](https://img.shields.io/github/languages/code-size/jet/Jet.ConfluentKafka.FSharp.svg)
 
-F# friendly wrapper for `Confluent.Kafka` versions `>= 1.1.0`, with minimal dependencies or additional abstractions.
+F# friendly wrapper for `Confluent.Kafka` versions `>= 1.2.0`, with minimal dependencies or additional abstractions.
 
 ## Components
 

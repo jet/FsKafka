@@ -9,9 +9,13 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- `config` argument to `KafakConsumerConfig` and `KafkaProduerConfig` constructors accepting an `IDictionary<string,string>` to match Confluent.Kafka 1.2 ctor overloads [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
+
 ### Changed
 
-- Targeted `MinVer` v `2.0.0-alpha.2`
+- Uses `MinVer` v `2.0.0-alpha.2` internally
+- Targets [`Confluent.Kafka` v `1.2.0`](https://github.com/confluentinc/confluent-kafka-dotnet/releases/tag/v1.2.0), `librdkafka.redist` v `1.2.0` [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
 
 ### Removed
 ### Fixed
