@@ -6,7 +6,7 @@
     <PackageProjectUrl>https://github.com/jet/Jet.ConfluentKafka.FSharp</PackageProjectUrl>
     <PackageTags>kafka fsharp</PackageTags>
     <PackageLicense>Apache-2.0</PackageLicense>
-    <Copyright>Copyright © 2016-9</Copyright>
+    <Copyright>Copyright ï¿½ 2016-9</Copyright>
 
     <RepoDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoDir>
 
@@ -30,5 +30,8 @@
     <Content Include="$(ThisDirAbsolute)tests/xunit.runner.json" Condition=" '$(OS)' != 'Windows_NT' AND '$(IsTestProject)' != 'false'">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup> <!-- net461 ref assemblies https://stackoverflow.com/a/57384175/11635 -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.0-preview.2" PrivateAssets="All" />
   </ItemGroup>
 </Project>
