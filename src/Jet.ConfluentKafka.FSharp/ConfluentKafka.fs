@@ -51,12 +51,11 @@ type KafkaProducerConfig private (inner, broker : Uri) =
             ?socketKeepAlive,
             /// Partition algorithm. Default: `ConsistentRandom`.
             ?partitioner,
-            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
-            ?custom,
-            /// Postprocesses the ProducerConfig after the rest of the rules have been applied
+            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
+            ?custom : IDictionary<string,string>,
             ?customize) =
         let c =
-            ProducerConfig(
+            ProducerConfig((match custom with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>),
                 ClientId = clientId, BootstrapServers = Config.validateBrokerUri broker,
                 RetryBackoffMs = Nullable (match retryBackoff with Some (t : TimeSpan) -> int t.TotalMilliseconds | None -> 1000), // CK default 100ms
                 MessageSendMaxRetries = Nullable (defaultArg retries 60), // default 2
@@ -68,7 +67,6 @@ type KafkaProducerConfig private (inner, broker : Uri) =
         partitioner |> Option.iter (fun x -> c.Partitioner <- Nullable x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable (int x.TotalMilliseconds))
-        custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter (fun f -> f c)
         KafkaProducerConfig(c, broker)
 
@@ -206,8 +204,8 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             ?statisticsInterval,
             /// Consumed offsets commit interval. Default 5s.
             ?offsetCommitInterval,
-            /// Misc configuration parameter to be passed to the underlying CK consumer.
-            ?custom,
+            /// Misc configuration parameters to be passed to the underlying CK consumer. (Same as constructor argument for Confluent.Kafka >=1.2.
+            ?custom : IDictionary<string,string>,
             /// Postprocesses the ConsumerConfig after the rest of the rules have been applied
             ?customize,
 
@@ -225,7 +223,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
         let minInFlightBytes = defaultArg minInFlightBytes (maxInFlightBytes * 2L / 3L)
         let fetchMaxBytes = defaultArg fetchMaxBytes 100_000
         let c =
-            ConsumerConfig(
+            ConsumerConfig((match custom with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>),
                 ClientId=clientId, BootstrapServers=Config.validateBrokerUri broker, GroupId=groupId,
                 AutoOffsetReset = Nullable (defaultArg autoOffsetReset AutoOffsetReset.Earliest), // default: latest
                 FetchMaxBytes = Nullable fetchMaxBytes, // default: 524_288_000
@@ -236,9 +234,8 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
         fetchMinBytes |> Option.iter (fun x -> c.FetchMinBytes <- x) // Fetch waits for this amount of data for up to FetchWaitMaxMs (100)
         offsetCommitInterval |> Option.iter<TimeSpan> (fun x -> c.AutoCommitIntervalMs <- Nullable <| int x.TotalMilliseconds)
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable <| int x.TotalMilliseconds)
-        custom |> Option.iter<seq<KeyValuePair<string,string>>> (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter<ConsumerConfig -> unit> (fun f -> f c)
-        {   inner = c 
+        {   inner = c
             topics = match Seq.toList topics with [] -> invalidArg "topics" "must be non-empty collection" | ts -> ts
             buffering = {
                 maxBatchDelay = defaultArg maxBatchDelay (TimeSpan.FromMilliseconds 500.); maxBatchSize = defaultArg maxBatchSize 1000
