@@ -10,7 +10,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 
-- `config` argument to `KafakConsumerConfig` and `KafkaProduerConfig` constructors accepting an `IDictionary<string,string>` to match Confluent.Kafka 1.2 ctor overloads [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
+- `config` argument to `KafaConsumerConfig` and `KafkaProduerConfig` constructors accepting an `IDictionary<string,string>` to match Confluent.Kafka 1.2 ctor overloads [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
 
 ### Changed
 
