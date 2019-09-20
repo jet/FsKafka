@@ -10,6 +10,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+
+- Targeted `MinVer` v `2.0.0-alpha.2`
+
 ### Removed
 ### Fixed
 
