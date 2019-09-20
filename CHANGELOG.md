@@ -10,10 +10,11 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 
-- `config` argument to `KafaConsumerConfig` and `KafkaProduerConfig` constructors accepting an `IDictionary<string,string>` to match Confluent.Kafka 1.2 ctor overloads [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
+- `config` argument to `KafaConsumerConfig` and `KafkaProducerConfig` constructors accepting an `IDictionary<string,string>` to match Confluent.Kafka 1.2 ctor overloads [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
 
 ### Changed
 
+- `offsetCommitInterval` renamed to `autoCommitInterval` to match name used in CK >= 1.0 [#45](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/45)
 - Uses `MinVer` v `2.0.0-alpha.2` internally
 - Targets [`Confluent.Kafka` v `1.2.0`](https://github.com/confluentinc/confluent-kafka-dotnet/releases/tag/v1.2.0), `librdkafka.redist` v `1.2.0` [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
 
