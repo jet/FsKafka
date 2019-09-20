@@ -208,7 +208,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             /// Stats reporting interval for the consumer. Default: no reporting.
             ?statisticsInterval,
             /// Consumed offsets commit interval. Default 5s.
-            ?offsetCommitInterval,
+            ?autoCommitInterval,
             /// Misc configuration parameters to be passed to the underlying CK consumer. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string,string>,
             /// Misc configuration parameter to be passed to the underlying CK consumer.
@@ -240,7 +240,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
                 EnableAutoOffsetStore = Nullable false, // explicit calls to StoreOffset are the only things that effect progression in offsets
                 LogConnectionClose = Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
         fetchMinBytes |> Option.iter (fun x -> c.FetchMinBytes <- x) // Fetch waits for this amount of data for up to FetchWaitMaxMs (100)
-        offsetCommitInterval |> Option.iter<TimeSpan> (fun x -> c.AutoCommitIntervalMs <- Nullable <| int x.TotalMilliseconds)
+        autoCommitInterval |> Option.iter<TimeSpan> (fun x -> c.AutoCommitIntervalMs <- Nullable <| int x.TotalMilliseconds)
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable <| int x.TotalMilliseconds)
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter<ConsumerConfig -> unit> (fun f -> f c)
