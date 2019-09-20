@@ -11,7 +11,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 ### Changed
 
-- Targeted `MinVer` v `2.0.0-alpha.2`
+- Targets `MinVer` v `2.0.0-alpha.2`
+- Targets `Confluent.Kafka` v `1.2.0`, `librdkafka.redist` v `1.2.0` [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
 
 ### Removed
 ### Fixed

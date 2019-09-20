@@ -64,7 +64,7 @@ type KafkaProducerConfig private (inner, broker : Uri) =
                 SocketKeepaliveEnable = Nullable (defaultArg socketKeepAlive true), // default: false
                 LogConnectionClose = Nullable false, // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
                 MaxInFlight = Nullable (defaultArg maxInFlight 1_000_000)) // default 1_000_000
-        linger |> Option.iter<TimeSpan> (fun x -> c.LingerMs <- Nullable (int x.TotalMilliseconds)) // default 0
+        linger |> Option.iter<TimeSpan> (fun x -> c.LingerMs <- Nullable x.TotalMilliseconds) // default 0
         partitioner |> Option.iter (fun x -> c.Partitioner <- Nullable x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable (int x.TotalMilliseconds))
@@ -150,7 +150,7 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
             /// Having a non-zero linger is critical to items getting into the correct groupings
             /// (even if it of itself does not guarantee anything based on Kafka's guarantees). Default: 100ms
             ?linger: TimeSpan) : BatchedProducer =
-        let lingerMs = match linger with Some x -> int x.TotalMilliseconds | None -> 100
+        let lingerMs = match linger with Some x -> x.TotalMilliseconds | None -> 100.
         log.Information("Producing... Using batch Mode with linger={lingerMs}", lingerMs)
         config.Inner.LingerMs <- Nullable lingerMs
         config.Inner.MaxInFlight <- Nullable (defaultArg maxInFlight 1)
