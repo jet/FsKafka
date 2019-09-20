@@ -9,6 +9,16 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+### Changed
+### Removed
+### Fixed
+
+<a name="1.2.0"></a>
+## [1.2.0] - 2019-09-21
+
+_NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a breaking change in the CK 1.2 release, see [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)._
+
+### Added
 
 - `config` argument to `KafaConsumerConfig` and `KafkaProducerConfig` constructors accepting an `IDictionary<string,string>` to match Confluent.Kafka 1.2 ctor overloads [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
 
@@ -17,9 +27,6 @@ The `Unreleased` section name is replaced by the expected version of next releas
 - `offsetCommitInterval` renamed to `autoCommitInterval` to match name used in CK >= 1.0 [#45](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/45)
 - Uses `MinVer` v `2.0.0-alpha.2` internally
 - Targets [`Confluent.Kafka` v `1.2.0`](https://github.com/confluentinc/confluent-kafka-dotnet/releases/tag/v1.2.0), `librdkafka.redist` v `1.2.0` [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
-
-### Removed
-### Fixed
 
 <a name="1.1.0"></a>
 ## [1.1.0] - 2019-06-28
@@ -215,7 +222,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.1.0...HEAD
+[Unreleased]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.1-rc1...1.0.1
 [1.0.1-rc1]: https://github.com/jet/Jet.ConfluentKafka.FSharp/compare/1.0.0-rc13...1.0.1-rc1
