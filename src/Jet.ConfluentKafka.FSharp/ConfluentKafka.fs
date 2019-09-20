@@ -55,7 +55,8 @@ type KafkaProducerConfig private (inner, broker : Uri) =
             ?custom : IDictionary<string,string>,
             ?customize) =
         let c =
-            ProducerConfig((match custom with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>),
+            let customPropsDictionary = match custom with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
+            ProducerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
                 ClientId = clientId, BootstrapServers = Config.validateBrokerUri broker,
                 RetryBackoffMs = Nullable (match retryBackoff with Some (t : TimeSpan) -> int t.TotalMilliseconds | None -> 1000), // CK default 100ms
                 MessageSendMaxRetries = Nullable (defaultArg retries 60), // default 2
@@ -223,7 +224,8 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
         let minInFlightBytes = defaultArg minInFlightBytes (maxInFlightBytes * 2L / 3L)
         let fetchMaxBytes = defaultArg fetchMaxBytes 100_000
         let c =
-            ConsumerConfig((match custom with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>),
+            let customPropsDictionary = match custom with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
+            ConsumerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
                 ClientId=clientId, BootstrapServers=Config.validateBrokerUri broker, GroupId=groupId,
                 AutoOffsetReset = Nullable (defaultArg autoOffsetReset AutoOffsetReset.Earliest), // default: latest
                 FetchMaxBytes = Nullable fetchMaxBytes, // default: 524_288_000
