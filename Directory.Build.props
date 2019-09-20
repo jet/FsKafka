@@ -8,7 +8,7 @@
     <PackageLicense>Apache-2.0</PackageLicense>
     <Copyright>Copyright � 2016-9</Copyright>
 
-    <RepoDir>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</RepoDir>
+    <ThisDirAbsolute>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</ThisDirAbsolute>
 
     <!-- SourceLink related properties https://github.com/dotnet/SourceLink#using-sourcelink -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -24,7 +24,6 @@
 
   <!-- Workaround for https://github.com/xunit/xunit/issues/1357 -->
   <PropertyGroup>
-    <ThisDirAbsolute>$([System.IO.Path]::GetFullPath("$(MSBuildThisFileDirectory)"))</ThisDirAbsolute>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="$(ThisDirAbsolute)tests/xunit.runner.json" Condition=" '$(OS)' != 'Windows_NT' AND '$(IsTestProject)' != 'false'">
