@@ -12,7 +12,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 
 - Targets `MinVer` v `2.0.0-alpha.2`
-- Targets `Confluent.Kafka` v `1.2.0`, `librdkafka.redist` v `1.2.0` [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
+- Targets [`Confluent.Kafka` v `1.2.0`](https://github.com/confluentinc/confluent-kafka-dotnet/releases/tag/v1.2.0), `librdkafka.redist` v `1.2.0` [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
 - Change `custom` argument to `IDictionary<string,string>` from `seq<KeyValuePair<string,string>>` to match Confluent.Kafka 1.2 ctor overload [#44](https://github.com/jet/Jet.ConfluentKafka.FSharp/pull/44)
 
 ### Removed
