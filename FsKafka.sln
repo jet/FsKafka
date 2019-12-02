@@ -7,7 +7,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{302B09C4
 		tests\xunit.runner.json = tests\xunit.runner.json
 	EndProjectSection
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Jet.ConfluentKafka.FSharp.Integration", "tests\Jet.ConfluentKafka.FSharp.Integration\Jet.ConfluentKafka.FSharp.Integration.fsproj", "{1D205901-2742-45EA-8255-E6322B49E3BB}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FsKafka.Integration", "tests\FsKafka.Integration\FsKafka.Integration.fsproj", "{1D205901-2742-45EA-8255-E6322B49E3BB}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{6EADC23C-D6CA-4CBB-AB71-DA4A218AE24D}"
 	ProjectSection(SolutionItems) = preProject
@@ -26,7 +26,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4670F7C4-A4FD-4E3F-B97C-99F9B3FC1898}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Jet.ConfluentKafka.FSharp", "src\Jet.ConfluentKafka.FSharp\Jet.ConfluentKafka.FSharp.fsproj", "{76802BE3-00C2-4B1D-96A2-95A3E2136DBE}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "FsKafka", "src\FsKafka\FsKafka.fsproj", "{76802BE3-00C2-4B1D-96A2-95A3E2136DBE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

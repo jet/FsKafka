@@ -1,4 +1,4 @@
-namespace Jet.ConfluentKafka.FSharp
+namespace FsKafka
 
 open System
 open System.Threading.Tasks

@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Jet.ConfluentKafka.FSharp\Jet.ConfluentKafka.FSharp.fsproj" />
+    <ProjectReference Include="..\..\src\FsKafka\FsKafka.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

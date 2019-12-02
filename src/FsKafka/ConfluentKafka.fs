@@ -1,4 +1,4 @@
-namespace Jet.ConfluentKafka.FSharp
+namespace FsKafka
 
 open Confluent.Kafka
 open Newtonsoft.Json
@@ -164,7 +164,7 @@ module Core =
     type ConsumerBufferingConfig = { minInFlightBytes : int64; maxInFlightBytes : int64; maxBatchSize : int; maxBatchDelay : TimeSpan }
 
     module Constants =
-        let messageCounterSourceContext = "Jet.ConfluentKafka.FSharp.Core.InFlightMessageCounter"
+        let messageCounterSourceContext = "FsKafka.Core.InFlightMessageCounter"
 
     type InFlightMessageCounter(log: ILogger, minInFlightBytes : int64, maxInFlightBytes : int64) =
         do  if minInFlightBytes < 1L then invalidArg "minInFlightBytes" "must be positive value"

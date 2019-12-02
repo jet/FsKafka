@@ -1,6 +1,6 @@
-namespace Jet.ConfluentKafka.FSharp.Integration
+namespace FsKafka.Integration
 
-open Jet.ConfluentKafka.FSharp
+open FsKafka
 open Newtonsoft.Json
 open Serilog
 open Swensen.Unquote

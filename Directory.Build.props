@@ -3,7 +3,7 @@
     <Authors>@jet @eulerfx @eiriktsarpalis @michaelliao5 and contributors</Authors>
     <Company>Jet.com</Company>
     <Description>Lightweight F# wrapper for Confluent.Kafka</Description>
-    <PackageProjectUrl>https://github.com/jet/Jet.ConfluentKafka.FSharp</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/jet/FsKafka</PackageProjectUrl>
     <PackageTags>kafka fsharp</PackageTags>
     <PackageLicense>Apache-2.0</PackageLicense>
     <Copyright>Copyright � 2016-9</Copyright>
