@@ -12,6 +12,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 
 - Renamed to `FsKafka`
+- Updated to `MinVer` v `2`, `Microsoft.SourceLink.GitHub` v `1` 
 
 ### Removed
 ### Fixed
