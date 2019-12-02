@@ -13,6 +13,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 - Renamed to `FsKafka`
 - Updated to `MinVer` v `2`, `Microsoft.SourceLink.GitHub` v `1` 
+- Updated to `Confluent.Kafka`, `librdkafka.redist` v `1.3.0`
 
 ### Removed
 ### Fixed
