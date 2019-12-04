@@ -10,13 +10,17 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
-
-- Renamed to `FsKafka`
-- Updated to `MinVer` v `2`, `Microsoft.SourceLink.GitHub` v `1` 
-- Updated to `Confluent.Kafka`, `librdkafka.redist` v `1.3.0`
-
 ### Removed
 ### Fixed
+
+<a name="1.3.0"></a>
+## [1.3.0] - 2019-12-04
+
+### Changed
+
+- Renamed to `FsKafka`
+- Updated to `MinVer` v `2.0.0`, `Microsoft.SourceLink.GitHub` v `1.0.0` 
+- Updated to `Confluent.Kafka`, `librdkafka.redist` v `1.3.0`
 
 <a name="1.2.0"></a>
 ## [1.2.0] - 2019-09-21
@@ -227,7 +231,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.2.0...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.3.0...HEAD
+[1.3.0]: https://github.com/jet/FsKafka/compare/1.2.0...1.3.0
 [1.2.0]: https://github.com/jet/FsKafka/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/jet/FsKafka/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/jet/FsKafka/compare/1.0.1-rc1...1.0.1

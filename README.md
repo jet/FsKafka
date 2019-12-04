@@ -1,6 +1,6 @@
 # FsKafka [![Build Status](https://dev.azure.com/jet-opensource/opensource/_apis/build/status/jet.FsKafka)](https://dev.azure.com/jet-opensource/opensource/_build/latest?definitionId=7) [![release](https://img.shields.io/github/release/jet/FsKafka.svg)](https://github.com/jet/FsKafka/releases) [![NuGet](https://img.shields.io/nuget/v/FsKafka.svg?logo=nuget)](https://www.nuget.org/packages/FsKafka/) [![license](https://img.shields.io/github/license/jet/FsKafka.svg)](LICENSE) ![code size](https://img.shields.io/github/languages/code-size/jet/FsKafka.svg)
 
-F# friendly wrapper for `Confluent.Kafka` versions `>= 1.2.0`, with minimal dependencies or additional abstractions.
+F# friendly wrapper for `Confluent.Kafka` versions `>= 1.3.0`, with minimal dependencies or additional abstractions.
 
 ## Components
 
