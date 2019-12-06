@@ -52,7 +52,7 @@ dotnet build build.proj -v n
 
 ### How do I get rid of all the `breaking off polling` ... `resuming polling` spam?
 
-- The `BatchedConsumer` implementation tries to give clear feedback as to when reading is not keeping up, for diagnostic purposes. As of [#32](https://github.com/jet/FsKafka/pull/32), such messages are tagged with the type `FsKafka.InFlightMessageCounter`, and as such can be silenced by including the following in one's `LoggerConfiguration()`: 
+- The `BatchedConsumer` implementation tries to give clear feedback as to when reading is not keeping up, for diagnostic purposes. As of [#32](https://github.com/jet/FsKafka/pull/32), such messages are tagged with the type `FsKafka.Core.InFlightMessageCounter`, and as such can be silenced by including the following in one's `LoggerConfiguration()`: 
 
     `.MinimumLevel.Override(FsKafka.Core.Constants.messageCounterSourceContext, Serilog.Events.LogEventLevel.Warning)`
 
