@@ -88,3 +88,16 @@ The [`v0` branch](tree/v0) continues to house the original code as previously bo
 - upgrading to a new version of `Confluent.Kafka` typically implies a knock on effect from an associated increment in the underlying `rdkafka` driver version (TODO - explain key behavior and perf changes between what  `1.0.0` implies vs `0.11.4`)
 - you'll need to wire the (`Serilog`-based) logging through to your log sink (it's easy to connect it to an NLog Target etc). (The `v0` branch exposes a logging scheme which requires more direct integration)
 - there's a transitive dependency on `Newtonsoft.Json` v `11.0.2` (which should generally not be a problem to accommodate in most codebases)
+
+## Minimal example
+
+```fsharp
+#r "nuget:FsKafka"
+open FsKafka
+open Confluent.Kafka
+    
+let producerConfig = KafkaProducerConfig.Create("MyClientId", Uri("kafka:9092"), Acks.All)
+let producer = KafkaProducer.Create(Serilog.LoggerConfiguration().CreateLogger(), producerConfig, "MyTopic")   
+let key = Guid.NewGuid().ToString()
+let produced = producer.ProduceAsync(key, "Hello World!) |> Async.RunSynchronously
+```
