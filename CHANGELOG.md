@@ -12,6 +12,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 
 - Target `Microsoft.NETFramework.ReferenceAssemblies` v `1.0.0`
+- *BREAKING*: Replace `broker : Uri` with `bootstrapServers : string` (use `(Config.validateBrokerUri broker)` for backcompat if required)
+
 
 ### Removed
 ### Fixed

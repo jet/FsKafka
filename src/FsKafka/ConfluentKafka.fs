@@ -10,21 +10,21 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 
-module private Config =
-    let validateBrokerUri (u:Uri) =
-        if not u.IsAbsoluteUri then invalidArg "broker" "should be of 'host:port' format"
-        if String.IsNullOrEmpty u.Authority then 
+module Config =
+    let validateBrokerUri (broker : Uri) =
+        if not broker.IsAbsoluteUri then invalidArg "broker" "should be of 'host:port' format"
+        if String.IsNullOrEmpty broker.Authority then
             // handle a corner case in which Uri instances are erroneously putting the hostname in the `scheme` field.
-            if System.Text.RegularExpressions.Regex.IsMatch(string u, "^\S+:[0-9]+$") then string u
+            if System.Text.RegularExpressions.Regex.IsMatch(string broker, "^\S+:[0-9]+$") then string broker
             else invalidArg "broker" "should be of 'host:port' format"
 
-        else u.Authority
+        else broker.Authority
 
-/// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specfic settings
+/// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
-type KafkaProducerConfig private (inner, broker : Uri) =
+type KafkaProducerConfig private (inner, bootstrapServers : string) =
     member __.Inner : ProducerConfig = inner
-    member __.Broker = broker
+    member __.BootstrapServers = bootstrapServers
 
     member __.Acks = let v = inner.Acks in v.Value
     member __.MaxInFlight = let v = inner.MaxInFlight in v.Value
@@ -32,7 +32,7 @@ type KafkaProducerConfig private (inner, broker : Uri) =
 
     /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
     static member Create
-        (   clientId : string, broker : Uri, acks,
+        (   clientId : string, bootstrapServers : string, acks,
             /// Message compression. Defaults to None.
             ?compression,
             /// Maximum in-flight requests. Default: 1_000_000.
@@ -60,7 +60,7 @@ type KafkaProducerConfig private (inner, broker : Uri) =
         let c =
             let customPropsDictionary = match config with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
             ProducerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
-                ClientId = clientId, BootstrapServers = Config.validateBrokerUri broker,
+                ClientId = clientId, BootstrapServers = bootstrapServers,
                 RetryBackoffMs = Nullable (match retryBackoff with Some (t : TimeSpan) -> int t.TotalMilliseconds | None -> 1000), // CK default 100ms
                 MessageSendMaxRetries = Nullable (defaultArg retries 60), // default 2
                 Acks = Nullable acks,
@@ -73,7 +73,7 @@ type KafkaProducerConfig private (inner, broker : Uri) =
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable (int x.TotalMilliseconds))
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter (fun f -> f c)
-        KafkaProducerConfig(c, broker)
+        KafkaProducerConfig(c, bootstrapServers)
 
 /// Creates and wraps a Confluent.Kafka Producer with the supplied configuration
 type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
@@ -91,8 +91,8 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string): KafkaProducer =
         if String.IsNullOrEmpty topic then nullArg "topic"
-        log.Information("Producing... {broker} / {topic} compression={compression} maxInFlight={maxInFlight} acks={acks}",
-            config.Broker, topic, config.Compression, config.MaxInFlight, config.Acks)
+        log.Information("Producing... {bootstrapServers} / {topic} compression={compression} maxInFlight={maxInFlight} acks={acks}",
+            config.BootstrapServers, topic, config.Compression, config.MaxInFlight, config.Acks)
         let p =
             ProducerBuilder<string, string>(config.Inner)
                 .SetLogHandler(fun _p m -> log.Information("Producing... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
@@ -194,7 +194,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
     /// Builds a Kafka Consumer Config suitable for KafkaConsumer.Start*
     static member Create
         (   /// Identify this consumer in logs etc
-            clientId, broker : Uri, topics,
+            clientId : string, bootstrapServers : string, topics,
             /// Consumer group identifier.
             groupId,
             /// Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest. Default: start from Earliest.
@@ -232,7 +232,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
         let c =
             let customPropsDictionary = match config with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
             ConsumerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
-                ClientId=clientId, BootstrapServers=Config.validateBrokerUri broker, GroupId=groupId,
+                ClientId=clientId, BootstrapServers=bootstrapServers, GroupId=groupId,
                 AutoOffsetReset = Nullable (defaultArg autoOffsetReset AutoOffsetReset.Earliest), // default: latest
                 FetchMaxBytes = Nullable fetchMaxBytes, // default: 524_288_000
                 MessageMaxBytes = Nullable (defaultArg messageMaxBytes fetchMaxBytes), // default 1_000_000
@@ -285,7 +285,7 @@ type ConsumerBuilder =
     static member WithLogging(log : ILogger, config : ConsumerConfig, ?onRevoke) =
         ConsumerBuilder<_,_>(config)
             .SetLogHandler(fun _c m -> log.Information("Consuming... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
-            .SetErrorHandler(fun _c e -> log.Error("Consuming... Error reason={reason} code={code} broker={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
+            .SetErrorHandler(fun _c e -> log.Error("Consuming... Error reason={reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
             .SetStatisticsHandler(fun c json -> 
                 // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
                 let stats = JToken.Parse json
@@ -447,7 +447,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
     /// Completion of the `partitionHandler` saves the attained offsets so the auto-commit can mark progress; yielding an exception terminates the processing
     static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>) =
         if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
-        log.Information("Consuming... {broker} {topics} {groupId} autoOffsetReset={autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlight={maxInFlightGB:n1}GB maxBatchDelay={maxBatchDelay}s maxBatchSize={maxBatchSize}",
+        log.Information("Consuming... {bootstrapServers} {topics} {groupId} autoOffsetReset={autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlight={maxInFlightGB:n1}GB maxBatchDelay={maxBatchDelay}s maxBatchSize={maxBatchSize}",
             config.inner.BootstrapServers, config.topics, config.inner.GroupId, (let x = config.inner.AutoOffsetReset in x.Value), config.inner.FetchMaxBytes,
             float config.buffering.maxInFlightBytes / 1024. / 1024. / 1024., (let t = config.buffering.maxBatchDelay in t.TotalSeconds), config.buffering.maxBatchSize)
         let partitionedCollection = new ConsumerImpl.PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>()
