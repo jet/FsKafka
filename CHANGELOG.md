@@ -10,11 +10,13 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+### Removed
+### Fixed
 
-- Target `Microsoft.NETFramework.ReferenceAssemblies` v `1.0.0`
-- *BREAKING*: Replace `broker : Uri` with `bootstrapServers : string` (use `(Config.validateBrokerUri broker)` for backcompat if required)
-- Updated to `Confluent.Kafka`, `librdkafka.redist` v `1.4.0`
+## [Unreleased]
 
+### Added
+### Changed
 ### Removed
 ### Fixed
 
@@ -246,7 +248,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.3.0...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.0...HEAD
+[1.4.0]: https://github.com/jet/FsKafka/compare/1.4.0...1.4.0
 [1.3.0]: https://github.com/jet/FsKafka/compare/1.2.0...1.3.0
 [1.2.0]: https://github.com/jet/FsKafka/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/jet/FsKafka/compare/1.0.1...1.1.0
