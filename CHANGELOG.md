@@ -13,7 +13,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 - Target `Microsoft.NETFramework.ReferenceAssemblies` v `1.0.0`
 - *BREAKING*: Replace `broker : Uri` with `bootstrapServers : string` (use `(Config.validateBrokerUri broker)` for backcompat if required)
-
+- Updated to `Confluent.Kafka`, `librdkafka.redist` v `1.4.0`
 
 ### Removed
 ### Fixed
