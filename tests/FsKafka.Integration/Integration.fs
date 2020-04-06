@@ -37,7 +37,7 @@ module Helpers =
     let getTestBroker() = 
         match Environment.GetEnvironmentVariable "TEST_KAFKA_BROKER" with
         | x when String.IsNullOrEmpty x -> invalidOp "missing environment variable 'TEST_KAFKA_BROKER'"
-        | x -> Uri x
+        | x -> Uri x |> Config.validateBrokerUri
 
     let newId () = let g = System.Guid.NewGuid() in g.ToString("N")
 
@@ -61,7 +61,7 @@ module Helpers =
     type ConsumedTestMessage = { consumerId : int ; message : ConsumeResult<string,string> ; payload : TestMessage }
     type ConsumerCallback = BatchedConsumer -> ConsumedTestMessage [] -> Async<unit>
 
-    let runProducers log (broker : Uri) (topic : string) (numProducers : int) (messagesPerProducer : int) = async {
+    let runProducers log broker (topic : string) (numProducers : int) (messagesPerProducer : int) = async {
         let runProducer (producerId : int) = async {
             let cfg = KafkaProducerConfig.Create("panther", broker, Acks.Leader)
             use producer = BatchedProducer.CreateWithConfigOverrides(log, cfg, topic, maxInFlight = 10000)
