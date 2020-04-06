@@ -18,6 +18,16 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+<a name="1.4.0"></a>
+## [1.4.0] - 2020-04-06
+
+### Changed
+
+- *BREAKING*: Replace `broker : Uri` with `bootstrapServers : string` (use `(Config.validateBrokerUri broker)` for backcompat if required)
+- Target `Microsoft.NETFramework.ReferenceAssemblies` v `1.0.0`, `Minver` v `2.2.0`
+- Updated to `Confluent.Kafka`, `librdkafka.redist` v `1.4.0`
+- Updated to SDK `3.1.101`, VM image `macOS-latest`
+
 <a name="1.3.0"></a>
 ## [1.3.0] - 2019-12-04
 
