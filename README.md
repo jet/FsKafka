@@ -83,10 +83,8 @@ The [`v0` branch](tree/v0) continues to house the original code as previously bo
 open Confluent.Kafka
 open FsKafka
 
-let producerConfig = KafkaProducerConfig.Create("MyClientId", Uri("kafka:9092"), Acks.All)
+let producerConfig = KafkaProducerConfig.Create("MyClientId", "kafka:9092", Acks.All)
 let producer = KafkaProducer.Create(Serilog.LoggerConfiguration().CreateLogger(), producerConfig, "MyTopic")   
 let key = Guid.NewGuid().ToString()
 let deliveryReport = producer.ProduceAsync(key, "Hello World!") |> Async.RunSynchronously
 ```
-
-
