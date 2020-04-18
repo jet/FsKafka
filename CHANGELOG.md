@@ -16,6 +16,10 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- Added optional `headers` param: `KafkaProducer.ProduceAsync(key, value, ?headers)`
+- Exposed lower level `KafkaProducer.ProduceAsync(Message<string,string>)`
+
 ### Changed
 ### Removed
 ### Fixed
