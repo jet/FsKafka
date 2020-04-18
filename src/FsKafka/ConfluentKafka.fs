@@ -86,8 +86,23 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// <remarks>
     ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
     ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
-    member __.ProduceAsync(key, value) : Async<DeliveryResult<_,_>>= async {
-        return! inner.ProduceAsync(topic, Message<_,_>(Key=key, Value=value)) |> Async.AwaitTaskCorrect }
+    member __.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<_,_>> = async {
+        let! ct = Async.CancellationToken
+        return! inner.ProduceAsync(topic, message, ct) |> Async.AwaitTaskCorrect }
+
+    /// Produces a single item, yielding a response upon completion/failure of the ack
+    /// <remarks>
+    ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
+    ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
+    member __.ProduceAsync(key, value, ?headers : #seq<string*byte[]>) : Async<DeliveryResult<_,_>> =
+        let message = Message<_,_>(Key=key, Value=value)
+        match headers with
+        | None -> ()
+        | Some hs ->
+            let messageHeaders = Headers()
+            for k, v in hs do messageHeaders.Add(k, v)
+            message.Headers <- messageHeaders
+        __.ProduceAsync(message)
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string): KafkaProducer =
         if String.IsNullOrEmpty topic then nullArg "topic"
