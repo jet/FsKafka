@@ -118,7 +118,7 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
 
         let! ct = Async.CancellationToken
 
-        let tcs = new TaskCompletionSource<DeliveryReport<_,_>[]>()
+        let tcs = TaskCompletionSource<DeliveryReport<_,_>[]>()
         let numMessages = keyValueBatch.Length
         let results = Array.zeroCreate<DeliveryReport<_,_>> numMessages
         let numCompleted = ref 0
@@ -317,9 +317,9 @@ type ConsumerBuilder =
 
 module private ConsumerImpl =
     /// guesstimate approximate message size in bytes
-    let approximateMessageBytes (message : ConsumeResult<string, string>) =
+    let approximateMessageBytes (result : ConsumeResult<string, string>) =
         let inline len (x:string) = match x with null -> 0 | x -> sizeof<char> * x.Length
-        16 + len message.Key + len message.Value |> int64
+        16 + len result.Message.Key + len result.Message.Value |> int64
 
     type BlockingCollection<'T> with
         member bc.FillBuffer(buffer : 'T[], maxDelay : TimeSpan) : int =
@@ -364,16 +364,16 @@ module private ConsumerImpl =
             | _ -> ()
 
     let mkBatchedMessageConsumer (log: ILogger) (buf : Core.ConsumerBufferingConfig) (ct : CancellationToken) (consumer : IConsumer<string, string>)
-            (partitionedCollection: PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>)
+            (partitionedCollection : PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>)
             (handler : ConsumeResult<string,string>[] -> Async<unit>) = async {
-        let tcs = new TaskCompletionSource<unit>()
+        let tcs = TaskCompletionSource<unit>()
         use cts = CancellationTokenSource.CreateLinkedTokenSource(ct)
         use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
 
         use _ = consumer
         
         let mcLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Core.Constants.messageCounterSourceContext)
-        let counter = new Core.InFlightMessageCounter(mcLog, buf.minInFlightBytes, buf.maxInFlightBytes)
+        let counter = Core.InFlightMessageCounter(mcLog, buf.minInFlightBytes, buf.maxInFlightBytes)
 
         // starts a tail recursive loop that dequeues batches for a given partition buffer and schedules the user callback
         let consumePartition (collection : BlockingCollection<ConsumeResult<string, string>>) =
@@ -413,10 +413,10 @@ module private ConsumerImpl =
         let ct = cts.Token
         try while not ct.IsCancellationRequested do
                 counter.AwaitThreshold(fun () -> Thread.Sleep 1)
-                try let message = consumer.Consume(ct) // NB TimeSpan overload yields AVEs on 1.0.0-beta2
-                    if message <> null then
-                        counter.Delta(+approximateMessageBytes message)
-                        partitionedCollection.Add(message.TopicPartition, message)
+                try let result = consumer.Consume(ct) // NB TimeSpan overload yields AVEs on 1.0.0-beta2
+                    if result <> null then
+                        counter.Delta(+approximateMessageBytes result)
+                        partitionedCollection.Add(result.TopicPartition, result)
                 with| :? ConsumeException as e -> log.Warning(e, "Consuming... exception {name}", consumer.Name)
                     | :? System.OperationCanceledException -> log.Warning("Consuming... cancelled {name}", consumer.Name)
         finally
@@ -427,8 +427,8 @@ module private ConsumerImpl =
     }
 
 /// Creates and wraps a Confluent.Kafka IConsumer, wrapping it to afford a batched consumption mode with implicit offset progression at the end of each
-/// (parallel across partitions, sequenced/monotinic within) batch of processing carried out by the `partitionHandler`
-/// Conclusion of the processing (when a `partionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
+/// (parallel across partitions, sequenced/monotonic within) batch of processing carried out by the `partitionHandler`
+/// Conclusion of the processing (when a `partitionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
 type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
 
     member __.Inner = inner
@@ -450,7 +450,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
         log.Information("Consuming... {bootstrapServers} {topics} {groupId} autoOffsetReset={autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlight={maxInFlightGB:n1}GB maxBatchDelay={maxBatchDelay}s maxBatchSize={maxBatchSize}",
             config.inner.BootstrapServers, config.topics, config.inner.GroupId, (let x = config.inner.AutoOffsetReset in x.Value), config.inner.FetchMaxBytes,
             float config.buffering.maxInFlightBytes / 1024. / 1024. / 1024., (let t = config.buffering.maxBatchDelay in t.TotalSeconds), config.buffering.maxBatchSize)
-        let partitionedCollection = new ConsumerImpl.PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>()
+        let partitionedCollection = ConsumerImpl.PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>()
         let onRevoke (xs : seq<TopicPartitionOffset>) = 
             for x in xs do
                 partitionedCollection.Revoke(x.TopicPartition)
@@ -468,10 +468,10 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
     /// that controls the number of handlers running concurrently across partitions for the given consumer instance.
     static member StartByKey(log: ILogger, config : KafkaConsumerConfig, degreeOfParallelism : int, keyHandler : ConsumeResult<_,_> [] -> Async<unit>) =
         let semaphore = new SemaphoreSlim(degreeOfParallelism)
-        let partitionHandler (messages : ConsumeResult<_,_>[]) = async {
+        let partitionHandler (results : ConsumeResult<_,_>[]) = async {
             return!
-                messages
-                |> Seq.groupBy (fun m -> m.Key)
+                results
+                |> Seq.groupBy (fun r -> r.Message.Key)
                 |> Seq.map (fun (_,gp) -> async { 
                     let! ct = Async.CancellationToken
                     let! _ = semaphore.WaitAsync ct |> Async.AwaitTaskCorrect

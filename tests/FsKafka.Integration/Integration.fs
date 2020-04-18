@@ -58,7 +58,7 @@ module Helpers =
 
     type TestMessage = { producerId : int ; messageId : int }
     [<NoComparison; NoEquality>]
-    type ConsumedTestMessage = { consumerId : int ; message : ConsumeResult<string,string> ; payload : TestMessage }
+    type ConsumedTestMessage = { consumerId : int ; result : ConsumeResult<string,string> ; payload : TestMessage }
     type ConsumerCallback = BatchedConsumer -> ConsumedTestMessage [] -> Async<unit>
 
     let runProducers log broker (topic : string) (numProducers : int) (messagesPerProducer : int) = async {
@@ -84,7 +84,7 @@ module Helpers =
 
     let runConsumers log (config : KafkaConsumerConfig) (numConsumers : int) (timeout : TimeSpan option) (handler : ConsumerCallback) = async {
         let mkConsumer (consumerId : int) = async {
-            let deserialize (msg : ConsumeResult<_,_>) = { consumerId = consumerId ; message = msg ; payload = JsonConvert.DeserializeObject<_> msg.Value }
+            let deserialize (result : ConsumeResult<_,_>) = { consumerId = consumerId ; result = result ; payload = JsonConvert.DeserializeObject<_> result.Message.Value }
 
             // need to pass the consumer instance to the handler callback; perform some cyclic dependency fixups
             let consumerCell = ref None
@@ -148,7 +148,7 @@ type T1(testOutputHelper) =
 
         let ``batches should be grouped by partition`` =
             consumedBatches
-            |> Seq.map (fun batch -> batch |> Seq.distinctBy (fun b -> b.message.Partition) |> Seq.length)
+            |> Seq.map (fun batch -> batch |> Seq.distinctBy (fun b -> b.result.Partition) |> Seq.length)
             |> Seq.forall (fun numKeys -> numKeys = 1)
         
         test <@ ``batches should be grouped by partition`` @> // "batches should be grouped by partition"
@@ -159,7 +159,7 @@ type T1(testOutputHelper) =
             |> Seq.toArray
 
         let ``all message keys should have expected value`` =
-            allMessages |> Array.forall (fun msg -> int msg.message.Key = msg.payload.messageId)
+            allMessages |> Array.forall (fun msg -> int msg.result.Message.Key = msg.payload.messageId)
 
         test <@ ``all message keys should have expected value`` @> // "all message keys should have expected value"
 
@@ -298,7 +298,7 @@ type T3(testOutputHelper) =
 
         do! runConsumers log config 1 None
                 (fun c b -> async {
-                    let partition = let p = b.[0].message.Partition in p.Value
+                    let partition = let p = b.[0].result.Partition in p.Value
 
                     // check batch sizes are bounded by maxBatchSize
                     test <@ b.Length <= maxBatchSize @> // "batch sizes should never exceed maxBatchSize")
@@ -311,8 +311,8 @@ type T3(testOutputHelper) =
                     // check for message monotonicity
                     let offset = getPartitionOffset partition
                     for msg in b do
-                        Assert.True((let o = msg.message.Offset in o.Value) > !offset, "offset for partition should be monotonic")
-                        offset := let o = msg.message.Offset in o.Value
+                        Assert.True((let o = msg.result.Offset in o.Value) > !offset, "offset for partition should be monotonic")
+                        offset := let o = msg.result.Offset in o.Value
 
                     do! Async.Sleep 100
 
