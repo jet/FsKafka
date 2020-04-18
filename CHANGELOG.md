@@ -16,13 +16,17 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
-
-- Added optional `headers` param: `KafkaProducer.ProduceAsync(key, value, ?headers)`
-- Exposed lower level `KafkaProducer.ProduceAsync(Message<string,string>)`
-
 ### Changed
 ### Removed
 ### Fixed
+
+<a name="1.4.1"></a>
+## [1.4.1] - 2020-04-18
+
+### Added
+
+- Added optional `headers` param: `KafkaProducer.ProduceAsync(key, value, ?headers)`
+- Exposed lower level `KafkaProducer.ProduceAsync(Message<string,string>)`
 
 <a name="1.4.0"></a>
 ## [1.4.0] - 2020-04-06
@@ -252,8 +256,9 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.0...HEAD
-[1.4.0]: https://github.com/jet/FsKafka/compare/1.4.0...1.4.0
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.1...HEAD
+[1.4.1]: https://github.com/jet/FsKafka/compare/1.4.0...1.4.1
+[1.4.0]: https://github.com/jet/FsKafka/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/jet/FsKafka/compare/1.2.0...1.3.0
 [1.2.0]: https://github.com/jet/FsKafka/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/jet/FsKafka/compare/1.0.1...1.1.0
