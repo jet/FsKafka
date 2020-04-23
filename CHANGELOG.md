@@ -25,15 +25,15 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 
-- Added optional `headers` param: `KafkaProducer.ProduceAsync(key, value, ?headers)`
-- Exposed lower level `KafkaProducer.ProduceAsync(Message<string,string>)`
+- Added optional `headers` param: `KafkaProducer.ProduceAsync(key, value, ?headers)` [#50](https://github.com/jet/FsKafka/pull/50)
+- Exposed lower level `KafkaProducer.ProduceAsync(Message<string,string>)` [#50](https://github.com/jet/FsKafka/pull/50)
 
 <a name="1.4.0"></a>
 ## [1.4.0] - 2020-04-06
 
 ### Changed
 
-- *BREAKING*: Replace `broker : Uri` with `bootstrapServers : string` (use `(Config.validateBrokerUri broker)` for backcompat if required)
+- *BREAKING*: Replace `broker : Uri` with `bootstrapServers : string` (use `(Config.validateBrokerUri broker)` for backcompat if required) [#49](https://github.com/jet/FsKafka/pull/49)
 - Target `Microsoft.NETFramework.ReferenceAssemblies` v `1.0.0`, `Minver` v `2.2.0`
 - Updated to `Confluent.Kafka`, `librdkafka.redist` v `1.4.0`
 - Updated to SDK `3.1.101`, VM image `macOS-latest`
