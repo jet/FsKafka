@@ -166,6 +166,8 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
         new BatchedProducer(log, inner.Inner, topic)
 
 module Core =
+
+    [<NoComparison>]
     type ConsumerBufferingConfig = { minInFlightBytes : int64; maxInFlightBytes : int64; maxBatchSize : int; maxBatchDelay : TimeSpan }
 
     module Constants =

@@ -1,4 +1,3 @@
-// Shims for stuff that's present in FsKafka 1.x
 namespace FsKafka
 
 open Confluent.Kafka
@@ -6,40 +5,14 @@ open Newtonsoft.Json
 open Newtonsoft.Json.Linq
 open Serilog
 open System
+open System.Collections.Concurrent
+open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
-open System.Collections.Generic
-open System.Collections.Concurrent
-
-// Cloned from FsKafka master branch
-module Core =
-    [<NoComparison>]
-    type ConsumerBufferingConfig = { minInFlightBytes : int64; maxInFlightBytes : int64; maxBatchSize : int; maxBatchDelay : TimeSpan }
-
-    module Constants =
-        let messageCounterSourceContext = "FsKafka.Core.InFlightMessageCounter"
-
-    type InFlightMessageCounter(log : ILogger, minInFlightBytes : int64, maxInFlightBytes : int64) =
-        do  if minInFlightBytes < 1L then invalidArg "minInFlightBytes" "must be positive value"
-            if maxInFlightBytes < 1L then invalidArg "maxInFlightBytes" "must be positive value"
-            if minInFlightBytes > maxInFlightBytes then invalidArg "maxInFlightBytes" "must be greater than minInFlightBytes"
-
-        let mutable inFlightBytes = 0L
-
-        member __.InFlightMb = float inFlightBytes / 1024. / 1024.
-        member __.Delta(numBytes : int64) = Interlocked.Add(&inFlightBytes, numBytes) |> ignore
-        member __.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
-        member __.AwaitThreshold busyWork =
-            if __.IsOverLimitNow() then
-                log.Information("Consuming... breached in-flight message threshold (now ~{max:n0}B), quiescing until it drops to < ~{min:n1}GB",
-                    inFlightBytes, float minInFlightBytes / 1024. / 1024. / 1024.)
-                while Volatile.Read(&inFlightBytes) > minInFlightBytes do
-                    busyWork ()
-                log.Verbose "Consumer resuming polling"
 
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
-type KafkaProducerConfig private (inner, bootstrapServers) =
+type KafkaProducerConfig private (inner, bootstrapServers : string) =
     member __.Inner : ProducerConfig = inner
     member __.BootstrapServers = bootstrapServers
 
@@ -49,7 +22,7 @@ type KafkaProducerConfig private (inner, bootstrapServers) =
 
     /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
     static member Create
-        (   clientId : string, bootstrapServers, acks,
+        (   clientId : string, bootstrapServers : string, acks,
             /// Message compression. Defaults to None.
             ?compression,
             /// Maximum in-flight requests. Default: 1_000_000.
@@ -68,6 +41,7 @@ type KafkaProducerConfig private (inner, bootstrapServers) =
             ?socketKeepAlive,
             /// Partition algorithm. Default: `ConsistentRandom`.
             ?partitioner,
+            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string,string>,
             /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
             ?custom,
@@ -108,7 +82,7 @@ type KafkaProducer private (inner : Producer<string, string>, topic : string, un
     /// <remarks>
     ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
     ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
-    member __.ProduceAsync(key, value) : Async<Message<_,_>>= async {
+    member __.ProduceAsync(key, value) : Async<Message<_,_>> = async {
         let! res = inner.ProduceAsync(topic, key = key, ``val`` = value) |> Async.AwaitTaskCorrect
         // Propulsion.Kafka.Producer duplicates this check, but this one should remain for consistency with Confluent.Kafka v1
         if res.Error.HasError then return failwithf "ProduceAsync error %O" res.Error
@@ -123,10 +97,7 @@ type KafkaProducer private (inner : Producer<string, string>, topic : string, un
         let d2 = p.OnError.Subscribe(fun e -> log.Error("Producing... {reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
         new KafkaProducer(p, topic, fun () -> for x in [d1;d2] do x.Dispose())
 
-type IProducer<'K,'V> = Confluent.Kafka.Producer<'K,'V>
-type DeliveryReport<'K,'V> = Confluent.Kafka.Message<'K,'V>
-
-type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, topic : string) =
+type BatchedProducer private (log: ILogger, inner : Producer<string, string>, topic : string) =
     member __.Inner = inner
     member __.Topic = topic
 
@@ -144,14 +115,14 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
 
         let! ct = Async.CancellationToken
 
-        let tcs = TaskCompletionSource<DeliveryReport<_,_>[]>()
+        let tcs = TaskCompletionSource<Message<_,_>[]>()
         let numMessages = keyValueBatch.Length
-        let results = Array.zeroCreate<DeliveryReport<_,_>> numMessages
+        let results = Array.zeroCreate<Message<_,_>> numMessages
         let numCompleted = ref 0
 
         use _ = ct.Register(fun _ -> tcs.TrySetCanceled() |> ignore)
 
-        let handler (m : DeliveryReport<string,string>) =
+        let handler (m : Message<string,string>) =
             if m.Error.HasError then
                 let errorMsg = exn (sprintf "Error on message topic=%s code=%O reason=%s" m.Topic m.Error.Code m.Error.Reason)
                 tcs.TrySetException errorMsg |> ignore
@@ -189,7 +160,33 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
         let inner = KafkaProducer.Create(log, config, topic)
         new BatchedProducer(log, inner.Inner, topic)
 
-/// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specfic settings
+module Core =
+
+    [<NoComparison>]
+    type ConsumerBufferingConfig = { minInFlightBytes : int64; maxInFlightBytes : int64; maxBatchSize : int; maxBatchDelay : TimeSpan }
+
+    module Constants =
+        let messageCounterSourceContext = "FsKafka.Core.InFlightMessageCounter"
+
+    type InFlightMessageCounter(log : ILogger, minInFlightBytes : int64, maxInFlightBytes : int64) =
+        do  if minInFlightBytes < 1L then invalidArg "minInFlightBytes" "must be positive value"
+            if maxInFlightBytes < 1L then invalidArg "maxInFlightBytes" "must be positive value"
+            if minInFlightBytes > maxInFlightBytes then invalidArg "maxInFlightBytes" "must be greater than minInFlightBytes"
+
+        let mutable inFlightBytes = 0L
+
+        member __.InFlightMb = float inFlightBytes / 1024. / 1024.
+        member __.Delta(numBytes : int64) = Interlocked.Add(&inFlightBytes, numBytes) |> ignore
+        member __.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
+        member __.AwaitThreshold busyWork =
+            if __.IsOverLimitNow() then
+                log.Information("Consuming... breached in-flight message threshold (now ~{max:n0}B), quiescing until it drops to < ~{min:n1}GB",
+                    inFlightBytes, float minInFlightBytes / 1024. / 1024. / 1024.)
+                while Volatile.Read(&inFlightBytes) > minInFlightBytes do
+                    busyWork ()
+                log.Verbose "Consumer resuming polling"
+
+/// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list; buffering: Core.ConsumerBufferingConfig } with
     member __.Buffering  = __.buffering
@@ -199,23 +196,25 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
     /// Builds a Kafka Consumer Config suitable for KafkaConsumer.Start*
     static member Create
         (   /// Identify this consumer in logs etc
-            clientId, bootstrapServers, topics,
+            clientId : string, bootstrapServers : string, topics,
             /// Consumer group identifier.
             groupId,
             /// Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest. Default: start from Earliest.
             ?autoOffsetReset,
-            /// Default 100kB.
+            /// Default 100kB. Confluent.Kafka default: 500MB
             ?fetchMaxBytes,
             /// Minimum number of bytes to wait for (subject to timeout with default of 100ms). Default 1B.
             ?fetchMinBytes,
             /// Stats reporting interval for the consumer. Default: no reporting.
-            ?statisticsInterval : TimeSpan,
+            ?statisticsInterval,
+            /// Consumed offsets commit interval. Default 5s.
+            ?autoCommitInterval,
+            /// Misc configuration parameters to be passed to the underlying CK consumer. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string,string>,
             /// Misc configuration parameter to be passed to the underlying CK consumer.
             ?custom,
             /// Postprocesses the ConsumerConfig after the rest of the rules have been applied
             ?customize,
-            ?autoCommitInterval,
 
             (* Client-side batching / limiting of reading ahead to constrain memory consumption *)
 
@@ -240,8 +239,8 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
                 LogConnectionClose = Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
         config |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         fetchMinBytes |> Option.iter (fun x -> c.FetchMinBytes <- x) // Fetch waits for this amount of data for up to FetchWaitMaxMs (100)
-        statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable <| int x.TotalMilliseconds)
         autoCommitInterval |> Option.iter<TimeSpan> (fun x -> c.AutoCommitIntervalMs  <- Nullable <| int x.TotalMilliseconds)
+        statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable <| int x.TotalMilliseconds)
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter<ConsumerConfig -> unit> (fun f -> f c)
         {   inner = c
@@ -323,14 +322,8 @@ type ConsumerBuilder =
         let unsubLog = ConsumerBuilder.WithLogging(log, consumer, ?onRevoke = onRevoke)
         consumer, unsubLog
 
-module Bindings =
-
-    let inline storeOffset (log : ILogger) (consumer : Consumer<_,_>) (highWaterMark : Confluent.Kafka.Message<string,string>) =
-        try let e = consumer.StoreOffset(highWaterMark)
-            if e.Error.HasError then log.Error("Consuming... storing offsets failed {@e}", e.Error)
-        with e -> log.Error(e, "Consuming... storing offsets failed")
-
 module private ConsumerImpl =
+
     /// guesstimate approximate message size in bytes
     let approximateMessageBytes (result : Message<string, string>) =
         let inline len (x:string) = match x with null -> 0 | x -> sizeof<char> * x.Length
@@ -353,8 +346,8 @@ module private ConsumerImpl =
             i
 
     type PartitionedBlockingCollection<'Key, 'Message when 'Key : equality>(?perPartitionCapacity : int) =
-        let collections = new ConcurrentDictionary<'Key, Lazy<BlockingCollection<'Message>>>()
-        let onPartitionAdded = new Event<'Key * BlockingCollection<'Message>>()
+        let collections = ConcurrentDictionary<'Key, Lazy<BlockingCollection<'Message>>>()
+        let onPartitionAdded = Event<'Key * BlockingCollection<'Message>>()
 
         let createCollection() =
             match perPartitionCapacity with
@@ -379,8 +372,8 @@ module private ConsumerImpl =
             | _ -> ()
 
     let mkBatchedMessageConsumer (log: ILogger) (buf : Core.ConsumerBufferingConfig) (ct : CancellationToken) (consumer : Consumer<string, string>)
-            (partitionedCollection : PartitionedBlockingCollection<TopicPartition, Confluent.Kafka.Message<string, string>>)
-            (handler : Confluent.Kafka.Message<string,string>[] -> Async<unit>) = async {
+            (partitionedCollection : PartitionedBlockingCollection<TopicPartition, Message<string, string>>)
+            (handler : Message<string,string>[] -> Async<unit>) = async {
         let tcs = TaskCompletionSource<unit>()
         use cts = CancellationTokenSource.CreateLinkedTokenSource(ct)
         use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
@@ -391,7 +384,7 @@ module private ConsumerImpl =
         let counter = Core.InFlightMessageCounter(mcLog, buf.minInFlightBytes, buf.maxInFlightBytes)
 
         // starts a tail recursive loop that dequeues batches for a given partition buffer and schedules the user callback
-        let consumePartition (collection : BlockingCollection<Confluent.Kafka.Message<string, string>>) =
+        let consumePartition (collection : BlockingCollection<Message<string, string>>) =
             let buffer = Array.zeroCreate buf.maxBatchSize
             let nextBatch () =
                 let count = collection.FillBuffer(buffer, buf.maxBatchDelay)
@@ -410,7 +403,9 @@ module private ConsumerImpl =
 
                             // store completed offsets
                             let lastItem = batch |> Array.maxBy (fun m -> let o = m.Offset in o.Value)
-                            Bindings.storeOffset log consumer lastItem
+                            try let e = consumer.StoreOffset(lastItem)
+                                if e.Error.HasError then log.Error("Consuming... storing offsets failed {@e}", e.Error)
+                            with e -> log.Error(e, "Consuming... storing offsets failed")
 
                             // decrement in-flight message counter
                             let batchSize = batch |> Array.sumBy approximateMessageBytes
@@ -451,7 +446,7 @@ type BatchedConsumer private (inner : Consumer<string, string>, task : Task<unit
 
     interface IDisposable with member __.Dispose() = __.Stop()
     /// Request cancellation of processing
-    member __.Stop() =  triggerStop ()
+    member __.Stop() = triggerStop ()
     /// Inspects current status of processing task
     member __.Status = task.Status
     member __.RanToCompletion = task.Status = System.Threading.Tasks.TaskStatus.RanToCompletion
@@ -475,6 +470,7 @@ type BatchedConsumer private (inner : Consumer<string, string>, task : Task<unit
         let triggerStop () =
             log.Information("Consuming... Stopping {name}", consumer.Name)
             cts.Cancel()
+            unsubLog ()
         let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionedCollection partitionHandler |> Async.StartAsTask
         let c = new BatchedConsumer(consumer, task, triggerStop)
         consumer.Subscribe config.topics
