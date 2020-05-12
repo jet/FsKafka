@@ -39,7 +39,7 @@ jobs:
             ches/kafka
         sleep 15
       displayName: Docker kafka for integration tests
-    - script: dotnet test build.proj -v d -p:TargetFrameworks=netcoreapp2.1 # net461 fails
+    - script: dotnet test build.proj -v d -p:TargetFrameworks=netcoreapp3.1 # net461 fails
       displayName: Run Integration tests
       env:
         TEST_KAFKA_BROKER: localhost:9092
