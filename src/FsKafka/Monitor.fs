@@ -123,10 +123,9 @@ module MonitorImpl =
                         { partition = p ; consumerOffset = cOffset.Offset ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = lag ; lead = lead ; messageCount = l - e }
                     | Choice2Of3 hwo ->
                         // in the event there is no consumer offset present, lag should be calculated as high watermark minus earliest
-                        // this prevents artifically high lags for partitions with no consumer offsets
+                        // this prevents artificially high lags for partitions with no consumer offsets
                         let e,l = (let v = hwo.Low in v.Value),let v = hwo.High in v.Value
                         { partition = p ; consumerOffset = Binding.offsetUnset; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
-                        //failwithf "unable to find consumer offset for topic=%s partition=%i" topic p
                     | Choice3Of3 o ->
                         let invalid = Binding.offsetUnset
                         { partition = p ; consumerOffset = o.Offset ; earliestOffset = invalid ; highWatermarkOffset = invalid ; lag = invalid.Value ; lead = invalid.Value ; messageCount = -1L })
@@ -214,7 +213,7 @@ module MonitorImpl =
                     // Partition got its initial offset value this window, check again next window.
                     false
                 | Valid _, Unset ->
-                    // Partition somehow lost its offset in this window, something's probably wrong.
+                    // Partition somehow lost its offset in this window, something is probably wrong.
                     true
                 | Unset, Unset ->
                     // Partition has invalid offsets for the entire window, there may be lag.
@@ -266,7 +265,7 @@ module MonitorImpl =
 
     let run (consumer : IConsumer<'k,'v> ) (interval,windowSize,failResetCount) (topic : string) (group : string) (onQuery,onCheckFailed,onStatus) =
         let getAssignedPartitions () = seq { for x in consumer.Assignment do if x.Topic = topic then yield Binding.partitionValue x.Partition }
-        let buffer = new RingBuffer<_>(windowSize)
+        let buffer = RingBuffer<_>(windowSize)
         let validateAssignments =
             let mutable assignments = getAssignedPartitions() |> set
             fun () ->
@@ -322,7 +321,7 @@ module MonitorImpl =
                     match res with
                     | Choice1Of3 (), _ -> ()
                     | Choice2Of3 (), errs ->
-                        let lag = function (partitionId, ErrorPartitionStalled lag) -> Some (partitionId,lag) | x -> failwithf "mismapped %A" x
+                        let lag = function (partitionId, ErrorPartitionStalled lag) -> Some (partitionId,lag) | x -> failwithf "mis-mapped %A" x
                         log.Error("Monitoring... {topic}/{group} Stalled with backlogs on {@stalled} [(partition,lag)]", topic, group, errs |> Seq.choose lag)
                     | Choice3Of3 (), warns ->
                         log.Warning("Monitoring... {topic}/{group} Growing lags on {@partitionIds}", topic, group, warns |> Seq.map fst)
@@ -341,7 +340,7 @@ module MonitorImpl =
         let logFailure (log : ILogger) (topic : string) (group : string) failCount exn =
             log.Warning(exn, "Monitoring... {topic}/{group} Exception # {failCount}", topic, group, failCount)
 
-/// Used to manage a set of bacground tasks that perdically (based on `interval`) grab the broker's recorded high/low watermarks
+/// Used to manage a set of background tasks that periodically (based on `interval`) grab the broker's recorded high/low watermarks
 /// and then map that to a per-partition status for each partition that the consumer being observed has been assigned
 type KafkaMonitor<'k,'v>
     (   log : ILogger,
@@ -354,7 +353,7 @@ type KafkaMonitor<'k,'v>
     let failResetCount = defaultArg failResetCount 3
     let interval = defaultArg interval (TimeSpan.FromSeconds 30.)
     let windowSize = defaultArg windowSize 10
-    let onStatus, onCheckFailed = new Event<string*(int *PartitionResult) list>(), new Event<string*int*exn>()
+    let onStatus, onCheckFailed = Event<string*(int *PartitionResult) list>(), Event<string*int*exn>()
 
     /// Periodically supplies the status for all assigned partitions (whenever we've gathered `windowSize` of readings)
     /// Subscriber can e.g. use this to force a consumer restart if no progress is being made

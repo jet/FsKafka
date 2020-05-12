@@ -70,8 +70,8 @@ module private NullableHelpers =
         else Null
 
 type ProducerConfig() =
-    let vals = Dictionary<string,obj>()
-    let set key value = vals.[key] <- box value
+    let values = Dictionary<string,obj>()
+    let set key value = values.[key] <- box value
 
     member __.Set(key, value) = set key value
 
@@ -101,11 +101,11 @@ type ProducerConfig() =
             match __.Partitioner            with Null -> () | HasValue v -> yield Config.Producer.partitioner ==> v
             match __.CompressionType        with Null -> () | HasValue v -> yield Config.Producer.compression ==> v
             match __.StatisticsIntervalMs   with Null -> () | HasValue v -> yield Config.statisticsInterval ==> v
-            yield! vals |]
+            yield! values |]
 
 type ConsumerConfig() =
-    let vals = Dictionary<string,obj>()
-    let set key value = vals.[key] <- box value
+    let values = Dictionary<string,obj>()
+    let set key value = values.[key] <- box value
 
     member __.Set(key, value) = set key value
 
@@ -133,4 +133,4 @@ type ConsumerConfig() =
             match __.FetchMinBytes          with Null -> () | HasValue v -> yield Config.Consumer.fetchMinBytes ==> v
             match __.AutoCommitIntervalMs   with Null -> () | HasValue v -> yield Config.Consumer.autoCommitInterval ==> v
             match __.StatisticsIntervalMs   with Null -> () | HasValue v -> yield Config.statisticsInterval ==> v
-            yield! vals |]
+            yield! values |]
