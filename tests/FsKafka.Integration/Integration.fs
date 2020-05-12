@@ -11,6 +11,16 @@ open System.Threading
 open System.Threading.Tasks
 open Xunit
 
+module Config =
+    let validateBrokerUri (broker : Uri) =
+        if not broker.IsAbsoluteUri then invalidArg "broker" "should be of 'host:port' format"
+        if String.IsNullOrEmpty broker.Authority then
+            // handle a corner case in which Uri instances are erroneously putting the hostname in the `scheme` field.
+            if System.Text.RegularExpressions.Regex.IsMatch(string broker, "^\S+:[0-9]+$") then string broker
+            else invalidArg "broker" "should be of 'host:port' format"
+
+        else broker.Authority
+
 [<AutoOpen>]
 [<EditorBrowsable(EditorBrowsableState.Never)>]
 module Helpers =

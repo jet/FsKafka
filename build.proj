@@ -14,10 +14,12 @@
 
   <Target Name="Pack">
     <Exec Command="dotnet pack src/FsKafka $(Cfg) $(PackOptions)" />
+    <Exec Command="dotnet pack src/FsKafka0 $(Cfg) $(PackOptions)" />
   </Target>
 
   <Target Name="VSTest">
     <Exec Command="dotnet test tests/FsKafka.Integration $(Cfg) $(TestOptions)" />
+    <Exec Command="dotnet test tests/FsKafka0.Integration $(Cfg) $(TestOptions)" />
   </Target>
 
   <Target Name="Build" DependsOnTargets="Pack;VSTest" />

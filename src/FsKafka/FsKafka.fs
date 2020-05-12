@@ -10,16 +10,6 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 
-module Config =
-    let validateBrokerUri (broker : Uri) =
-        if not broker.IsAbsoluteUri then invalidArg "broker" "should be of 'host:port' format"
-        if String.IsNullOrEmpty broker.Authority then
-            // handle a corner case in which Uri instances are erroneously putting the hostname in the `scheme` field.
-            if System.Text.RegularExpressions.Regex.IsMatch(string broker, "^\S+:[0-9]+$") then string broker
-            else invalidArg "broker" "should be of 'host:port' format"
-
-        else broker.Authority
-
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaProducerConfig private (inner, bootstrapServers : string) =
@@ -199,7 +189,7 @@ module Core =
                     busyWork ()
                 log.Verbose "Consumer resuming polling"
 
-/// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specfic settings
+/// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list; buffering: Core.ConsumerBufferingConfig } with
     member __.Buffering  = __.buffering
@@ -353,8 +343,8 @@ module private ConsumerImpl =
             i
 
     type PartitionedBlockingCollection<'Key, 'Message when 'Key : equality>(?perPartitionCapacity : int) =
-        let collections = new ConcurrentDictionary<'Key, Lazy<BlockingCollection<'Message>>>()
-        let onPartitionAdded = new Event<'Key * BlockingCollection<'Message>>()
+        let collections = ConcurrentDictionary<'Key, Lazy<BlockingCollection<'Message>>>()
+        let onPartitionAdded = Event<'Key * BlockingCollection<'Message>>()
 
         let createCollection() =
             match perPartitionCapacity with
