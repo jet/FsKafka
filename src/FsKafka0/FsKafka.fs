@@ -324,10 +324,34 @@ type ConsumerBuilder =
 
 module private ConsumerImpl =
 
-    /// guesstimate approximate message size in bytes
-    let approximateMessageBytes (result : Message<string, string>) =
+   /// used for calculating approximate message size in bytes
+    let getMessageSize (message : Message<string, string>) =
         let inline len (x:string) = match x with null -> 0 | x -> sizeof<char> * x.Length
-        16 + len result.Key + len result.Value |> int64
+        16 + len message.Key + len message.Value |> int64
+
+    let getBatchOffset (batch : Message<string, string>[]) =
+        let maxOffset = batch |> Array.maxBy (fun m -> let o = m.Offset in o.Value)
+        maxOffset.TopicPartitionOffset
+
+    let mkMessage (msg : Message<string, string>) =
+        if msg.Error.HasError then
+            failwithf "error consuming message topic=%s partition=%d offset=%O code=%O reason=%s"
+                            msg.Topic msg.Partition msg.Offset msg.Error.Code msg.Error.Reason
+        msg
+
+    let storeOffset (consumer : Consumer<string, string>) (tpo : TopicPartitionOffset) =
+        consumer.StoreOffsets[| TopicPartitionOffset(tpo.Topic, tpo.Partition, Offset(let o = tpo.Offset in o.Value + 1L)) |]
+        |> ignore
+
+    let runPoll (consumer : Consumer<string, string>) (pollTimeout : TimeSpan) (counter : Core.InFlightMessageCounter) =
+        let cts = new CancellationTokenSource()
+        let poll() =
+            while not cts.IsCancellationRequested do
+                counter.AwaitThreshold(fun () -> Thread.Sleep 5)
+                consumer.Poll(pollTimeout)
+
+        let _ = Async.StartAsTask(async { poll() })
+        { new IDisposable with member __.Dispose() = cts.Cancel() }
 
     type BlockingCollection<'T> with
         member bc.FillBuffer(buffer : 'T[], maxDelay : TimeSpan) : int =
@@ -371,25 +395,22 @@ module private ConsumerImpl =
             | true, coll -> Task.Delay(10000).ContinueWith(fun _ -> coll.Value.CompleteAdding()) |> ignore
             | _ -> ()
 
-    let mkBatchedMessageConsumer (log: ILogger) (buf : Core.ConsumerBufferingConfig) (ct : CancellationToken) (consumer : Consumer<string, string>)
-            (partitionedCollection : PartitionedBlockingCollection<TopicPartition, Message<string, string>>)
-            (handler : Message<string,string>[] -> Async<unit>) = async {
+    let mkBatchedMessageConsumer (log: ILogger) (buf : Core.ConsumerBufferingConfig) (ct : CancellationToken) (consumer : Consumer<string, string>) (handler : Message<string, string>[] -> Async<unit>) = async {
         let tcs = TaskCompletionSource<unit>()
         use cts = CancellationTokenSource.CreateLinkedTokenSource(ct)
         use _ = ct.Register(fun _ -> tcs.TrySetResult () |> ignore)
 
         use _ = consumer
 
-        let mcLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Core.Constants.messageCounterSourceContext)
-        let counter = Core.InFlightMessageCounter(mcLog, buf.minInFlightBytes, buf.maxInFlightBytes)
+        let counter = Core.InFlightMessageCounter(log, buf.maxInFlightBytes, buf.maxInFlightBytes)
+        let partitionedCollection = PartitionedBlockingCollection<TopicPartition, Message<string, string>>()
 
-        // starts a tail recursive loop that dequeues batches for a given partition buffer and schedules the user callback
-        let consumePartition (collection : BlockingCollection<Message<string, string>>) =
+        // starts a tail recursive loop which dequeues batches for a given partition buffer and schedules the user callback
+        let consumePartition (_key : TopicPartition) (collection : BlockingCollection<Message<string, string>>) =
             let buffer = Array.zeroCreate buf.maxBatchSize
             let nextBatch () =
                 let count = collection.FillBuffer(buffer, buf.maxBatchDelay)
-                if count <> 0 then log.Debug("Consuming {count}", count)
-                let batch = Array.init count (fun i -> buffer.[i])
+                let batch = Array.init count (fun i -> mkMessage buffer.[i])
                 Array.Clear(buffer, 0, count)
                 batch
 
@@ -402,39 +423,26 @@ module private ConsumerImpl =
                             do! handler batch
 
                             // store completed offsets
-                            let lastItem = batch |> Array.maxBy (fun m -> let o = m.Offset in o.Value)
-                            try let e = consumer.StoreOffset(lastItem)
-                                if e.Error.HasError then log.Error("Consuming... storing offsets failed {@e}", e.Error)
-                            with e -> log.Error(e, "Consuming... storing offsets failed")
+                            storeOffset consumer (getBatchOffset batch)
 
                             // decrement in-flight message counter
-                            let batchSize = batch |> Array.sumBy approximateMessageBytes
-                            counter.Delta(-batchSize)
+                            let batchSize = batch |> Array.sumBy (fun m -> getMessageSize m)
+                            counter.Delta -batchSize
                     with e ->
                         tcs.TrySetException e |> ignore
                         cts.Cancel()
-                    return! loop() }
+                    do! loop() }
 
             Async.Start(loop(), cts.Token)
 
-        use _ = partitionedCollection.OnPartitionAdded.Subscribe (fun (_key,buffer) -> consumePartition buffer)
+        use _ = partitionedCollection.OnPartitionAdded.Subscribe (fun (key,buffer) -> consumePartition key buffer)
+        use _ = consumer.OnPartitionsRevoked.Subscribe (fun ps -> for p in ps do partitionedCollection.Revoke p)
+        use _ = consumer.OnMessage.Subscribe (fun m -> counter.Delta(getMessageSize m) ; partitionedCollection.Add(m.TopicPartition, m))
 
-        // run the consumer
-        let ct = cts.Token
-        try while not ct.IsCancellationRequested do
-                counter.AwaitThreshold(fun () -> Thread.Sleep 1)
-                try let mutable message = null
-                    if consumer.Consume(&message, 5) then
-                        if message.Error.HasError then log.Warning("Consuming... error {e}", message.Error)
-                        else
-                            counter.Delta(+approximateMessageBytes message)
-                            partitionedCollection.Add(message.TopicPartition, message)
-                with| :? System.OperationCanceledException -> log.Warning("Consuming... cancelled {name}", consumer.Name)
-        finally
-            consumer.Dispose()
+        use _ = runPoll consumer (TimeSpan.FromMilliseconds 200.) counter // run the consumer
 
         // await for handler faults or external cancellation
-        return! Async.AwaitTaskCorrect tcs.Task
+        do! Async.AwaitTaskCorrect tcs.Task
     }
 
 /// Creates and wraps a Confluent.Kafka IConsumer, wrapping it to afford a batched consumption mode with implicit offset progression at the end of each
@@ -471,7 +479,7 @@ type BatchedConsumer private (inner : Consumer<string, string>, task : Task<unit
             log.Information("Consuming... Stopping {name}", consumer.Name)
             cts.Cancel()
             unsubLog ()
-        let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionedCollection partitionHandler |> Async.StartAsTask
+        let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionHandler |> Async.StartAsTask
         let c = new BatchedConsumer(consumer, task, triggerStop)
         consumer.Subscribe config.topics
         c
