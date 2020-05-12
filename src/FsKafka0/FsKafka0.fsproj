@@ -8,12 +8,14 @@
     <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
     <GenerateDocumentationFile Condition=" '$(Configuration)' == 'Release' ">true</GenerateDocumentationFile>
     <DefineConstants Condition=" '$(TargetFramework)' == 'net461' ">NET461</DefineConstants>
+    <DefineConstants>$(DefineConstants);KAFKA0</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="..\FsKafka\Infrastructure.fs" Link="Infrastructure.fs" />
     <Compile Include="ConfluentKafkaShims.fs" />
     <Compile Include="FsKafka.fs" />
+    <Compile Include="..\FsKafka\Monitor.fs" Link="Monitor.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Include="..\FsKafka.Integration\Integration.fs" Link="Integration.fs" />
+    <Compile Include="..\FsKafka.Integration\MonitorTests.fs" Link="MonitorTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
