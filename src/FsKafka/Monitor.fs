@@ -13,7 +13,7 @@ module Binding =
 #if KAFKA0
     let message (x : Confluent.Kafka.Message<string, string>) = x
     let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, partition)
-    let partitionValue = id
+    let partitionValue (partition : int) = partition
     let internal offsetUnset = Offset.Invalid
 
 type ConsumeResult<'A, 'B> = Confluent.Kafka.Message<'A, 'B>
