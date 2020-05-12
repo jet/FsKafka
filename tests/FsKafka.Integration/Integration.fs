@@ -11,6 +11,19 @@ open System.Threading
 open System.Threading.Tasks
 open Xunit
 
+#if KAFKA0
+type ConsumeResult<'A, 'B> = Confluent.Kafka.Message<'A, 'B>
+module Bindings =
+
+    let toMessage (x : Confluent.Kafka.Message<string, string>) = x
+    let partition (x : Confluent.Kafka.Message<string, string>) = x.Partition
+#else
+module Bindings =
+
+    let toMessage (x : Confluent.Kafka.ConsumeResult<string, string>) = x.Message
+    let partition (x : Confluent.Kafka.ConsumeResult<string, string>) = let p = x.Partition in p.Value
+#endif
+
 module Config =
     let validateBrokerUri (broker : Uri) =
         if not broker.IsAbsoluteUri then invalidArg "broker" "should be of 'host:port' format"
@@ -94,7 +107,9 @@ module Helpers =
 
     let runConsumers log (config : KafkaConsumerConfig) (numConsumers : int) (timeout : TimeSpan option) (handler : ConsumerCallback) = async {
         let mkConsumer (consumerId : int) = async {
-            let deserialize (result : ConsumeResult<_,_>) = { consumerId = consumerId ; result = result ; payload = JsonConvert.DeserializeObject<_> result.Message.Value }
+            let deserialize (result : ConsumeResult<_,_>) =
+                let message = Bindings.toMessage result
+                { consumerId = consumerId ; result = result ; payload = JsonConvert.DeserializeObject<_> message.Value }
 
             // need to pass the consumer instance to the handler callback; perform some cyclic dependency fixups
             let consumerCell = ref None
@@ -169,7 +184,9 @@ type T1(testOutputHelper) =
             |> Seq.toArray
 
         let ``all message keys should have expected value`` =
-            allMessages |> Array.forall (fun msg -> int msg.result.Message.Key = msg.payload.messageId)
+            allMessages |> Array.forall (fun msg ->
+                let message = Bindings.toMessage msg.result
+                int message.Key = msg.payload.messageId)
 
         test <@ ``all message keys should have expected value`` @> // "all message keys should have expected value"
 
@@ -308,7 +325,7 @@ type T3(testOutputHelper) =
 
         do! runConsumers log config 1 None
                 (fun c b -> async {
-                    let partition = let p = b.[0].result.Partition in p.Value
+                    let partition = Bindings.partition b.[0].result
 
                     // check batch sizes are bounded by maxBatchSize
                     test <@ b.Length <= maxBatchSize @> // "batch sizes should never exceed maxBatchSize")

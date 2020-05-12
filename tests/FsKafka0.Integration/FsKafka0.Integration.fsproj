@@ -4,6 +4,7 @@
     <TargetFrameworks>netcoreapp2.1;net461</TargetFrameworks>
     <WarningLevel>5</WarningLevel>
     <IsPackable>false</IsPackable>
+    <DefineConstants>KAFKA0</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FsKafka\FsKafka.fsproj" />
+    <ProjectReference Include="..\..\src\FsKafka0\FsKafka0.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
