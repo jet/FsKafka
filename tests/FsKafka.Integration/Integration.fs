@@ -13,15 +13,6 @@ open Xunit
 
 #if KAFKA0
 type ConsumeResult<'A, 'B> = Confluent.Kafka.Message<'A, 'B>
-module Bindings =
-
-    let toMessage (x : Confluent.Kafka.Message<string, string>) = x
-    let partition (x : Confluent.Kafka.Message<string, string>) = x.Partition
-#else
-module Bindings =
-
-    let toMessage (x : Confluent.Kafka.ConsumeResult<string, string>) = x.Message
-    let partition (x : Confluent.Kafka.ConsumeResult<string, string>) = let p = x.Partition in p.Value
 #endif
 
 module Config =
@@ -107,8 +98,8 @@ module Helpers =
 
     let runConsumers log (config : KafkaConsumerConfig) (numConsumers : int) (timeout : TimeSpan option) (handler : ConsumerCallback) = async {
         let mkConsumer (consumerId : int) = async {
-            let deserialize (result : ConsumeResult<_,_>) =
-                let message = Bindings.toMessage result
+            let deserialize result =
+                let message = Binding.message result
                 { consumerId = consumerId ; result = result ; payload = JsonConvert.DeserializeObject<_> message.Value }
 
             // need to pass the consumer instance to the handler callback; perform some cyclic dependency fixups
@@ -185,7 +176,7 @@ type T1(testOutputHelper) =
 
         let ``all message keys should have expected value`` =
             allMessages |> Array.forall (fun msg ->
-                let message = Bindings.toMessage msg.result
+                let message = Binding.message msg.result
                 int message.Key = msg.payload.messageId)
 
         test <@ ``all message keys should have expected value`` @> // "all message keys should have expected value"
@@ -316,16 +307,16 @@ type T3(testOutputHelper) =
         let globalMessageCount = ref 0
 
         let getPartitionOffset = 
-            let state = new ConcurrentDictionary<int, int64 ref>()
+            let state = ConcurrentDictionary<int, int64 ref>()
             fun partition -> state.GetOrAdd(partition, fun _ -> ref -1L)
 
         let getBatchPartitionCount =
-            let state = new ConcurrentDictionary<int, int ref>()
+            let state = ConcurrentDictionary<int, int ref>()
             fun partition -> state.GetOrAdd(partition, fun _ -> ref 0)
 
         do! runConsumers log config 1 None
                 (fun c b -> async {
-                    let partition = Bindings.partition b.[0].result
+                    let partition = Binding.partitionValue b.[0].result.Partition
 
                     // check batch sizes are bounded by maxBatchSize
                     test <@ b.Length <= maxBatchSize @> // "batch sizes should never exceed maxBatchSize")

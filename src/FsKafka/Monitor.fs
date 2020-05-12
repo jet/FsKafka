@@ -8,23 +8,21 @@ open Serilog
 open System
 open System.Diagnostics
 
+module Binding =
+
 #if KAFKA0
+    let message (x : Confluent.Kafka.Message<string, string>) = x
+    let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, partition)
+    let partitionValue = id
+    let internal offsetUnset = Offset.Invalid
+
 type ConsumeResult<'A, 'B> = Confluent.Kafka.Message<'A, 'B>
 type IConsumer<'A, 'B> = Confluent.Kafka.Consumer<'A, 'B>
-
-module Bindings =
-
-    let message (x : Confluent.Kafka.Message<string, string>) = x
-    let makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, partition)
-    let partitionValue = id
-    let offsetUnset = Offset.Invalid
 #else
-module Bindings =
-
     let message (x : Confluent.Kafka.ConsumeResult<string, string>) = x.Message
-    let makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, Partition partition)
+    let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, Partition partition)
     let partitionValue (partition : Partition) = let p = partition in p.Value
-    let offsetUnset = Offset.Unset
+    let internal offsetUnset = Offset.Unset
 #endif
 
 type PartitionResult =
@@ -95,20 +93,20 @@ module MonitorImpl =
         /// Returns consumer progress information.
         /// Note that this does not join the group as a consumer instance
         let progress (timeout : TimeSpan) (consumer : IConsumer<'k,'v>) (topic : string) (ps : int[]) = async {
-            let topicPartitions = ps |> Seq.map (Bindings.makeTopicPartition topic)
+            let topicPartitions = ps |> Seq.map (Binding.makeTopicPartition topic)
 
             let sw = System.Diagnostics.Stopwatch.StartNew()
             let committedOffsets =
                 consumer.Committed(topicPartitions, timeout)
-                |> Seq.sortBy(fun e -> Bindings.partitionValue e.Partition)
-                |> Seq.map(fun e -> Bindings.partitionValue e.Partition, e)
+                |> Seq.sortBy(fun e -> Binding.partitionValue e.Partition)
+                |> Seq.map(fun e -> Binding.partitionValue e.Partition, e)
                 |> Map.ofSeq
 
             let timeout = let elapsed = sw.Elapsed in if elapsed > timeout then TimeSpan.Zero else timeout - elapsed
             let! watermarkOffsets =
                 topicPartitions
                 |> Seq.map(fun tp -> async {
-                    return Bindings.partitionValue tp.Partition, consumer.QueryWatermarkOffsets(tp, timeout)} )
+                    return Binding.partitionValue tp.Partition, consumer.QueryWatermarkOffsets(tp, timeout)} )
                 |> Async.Parallel
             let watermarkOffsets = watermarkOffsets |> Map.ofArray
 
@@ -120,17 +118,17 @@ module MonitorImpl =
                         // Consumer offset of (Invalid Offset -1001) indicates that no consumer offset is present.  In this case, we should calculate lag as the high water mark minus earliest offset
                         let lag, lead =
                           match o with
-                          | offset when offset = let v = Bindings.offsetUnset in v.Value -> l - e, 0L
+                          | offset when offset = let v = Binding.offsetUnset in v.Value -> l - e, 0L
                           | _ -> l - o, o - e
                         { partition = p ; consumerOffset = cOffset.Offset ; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = lag ; lead = lead ; messageCount = l - e }
                     | Choice2Of3 hwo ->
                         // in the event there is no consumer offset present, lag should be calculated as high watermark minus earliest
                         // this prevents artifically high lags for partitions with no consumer offsets
                         let e,l = (let v = hwo.Low in v.Value),let v = hwo.High in v.Value
-                        { partition = p ; consumerOffset = Bindings.offsetUnset; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
+                        { partition = p ; consumerOffset = Binding.offsetUnset; earliestOffset = hwo.Low ; highWatermarkOffset = hwo.High ; lag = l - e ; lead = 0L ; messageCount = l - e }
                         //failwithf "unable to find consumer offset for topic=%s partition=%i" topic p
                     | Choice3Of3 o ->
-                        let invalid = Bindings.offsetUnset
+                        let invalid = Binding.offsetUnset
                         { partition = p ; consumerOffset = o.Offset ; earliestOffset = invalid ; highWatermarkOffset = invalid ; lag = invalid.Value ; lead = invalid.Value ; messageCount = -1L })
                 |> Seq.map (fun kvp -> kvp.Value)
                 |> Seq.toArray
@@ -141,7 +139,7 @@ module MonitorImpl =
                 minLead =
                     if partitions.Length > 0 then
                         partitions |> Seq.map (fun p -> p.lead) |> Seq.min
-                    else let v = Bindings.offsetUnset in v.Value } }
+                    else let v = Binding.offsetUnset in v.Value } }
 
     type PartitionInfo =
         {   partition : int
@@ -262,12 +260,12 @@ module MonitorImpl =
             |> Seq.map (fun (p, info) -> p, checkRulesForPartition (Array.ofSeq info))
 
     let private queryConsumerProgress intervalMs  (consumer : IConsumer<'k,'v>) (topic : string) = async {
-        let partitionIds = [| for t in consumer.Assignment do if t.Topic = topic then yield Bindings.partitionValue t.Partition |]
+        let partitionIds = [| for t in consumer.Assignment do if t.Topic = topic then yield Binding.partitionValue t.Partition |]
         let! r = ConsumerInfo.progress intervalMs consumer topic partitionIds
         return createPartitionInfoList r }
 
     let run (consumer : IConsumer<'k,'v> ) (interval,windowSize,failResetCount) (topic : string) (group : string) (onQuery,onCheckFailed,onStatus) =
-        let getAssignedPartitions () = seq { for x in consumer.Assignment do if x.Topic = topic then yield Bindings.partitionValue x.Partition }
+        let getAssignedPartitions () = seq { for x in consumer.Assignment do if x.Topic = topic then yield Binding.partitionValue x.Partition }
         let buffer = new RingBuffer<_>(windowSize)
         let validateAssignments =
             let mutable assignments = getAssignedPartitions() |> set
