@@ -26,6 +26,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 - `KafkaConsumerConfig.Create`: Made `autoOffsetReset` argument mandatory [#52](https://github.com/jet/FsKafka/pull/52)
 
 ### Removed
+
+- Removed `Config.validateBrokerUri` [#51](https://github.com/jet/FsKafka/pull/51)
+
 ### Fixed
 
 <a name="1.4.1"></a>
