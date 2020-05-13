@@ -476,7 +476,7 @@ type BatchedConsumer private (inner : Consumer<string, string>, task : Task<unit
         let consumer, unsubLog = ConsumerBuilder.WithLogging(log, config.inner, onRevoke = onRevoke)
         let cts = new CancellationTokenSource()
         let triggerStop () =
-            log.Information("Consuming... Stopping {name}", consumer.Name)
+            log.Information("Consuming... Stopping {name:l}", consumer.Name)
             cts.Cancel()
             unsubLog ()
         let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionHandler |> Async.StartAsTask

@@ -181,13 +181,13 @@ type T1(testOutputHelper) =
 
         test <@ ``all message keys should have expected value`` @> // "all message keys should have expected value"
 
-        let ``should have consumed all expected messages`` =
+        let ``grouped messages`` =
             allMessages
             |> Array.groupBy (fun msg -> msg.payload.producerId)
             |> Array.map (fun (_, gp) -> gp |> Array.distinctBy (fun msg -> msg.payload.messageId))
-            |> Array.forall (fun gp -> gp.Length = messagesPerProducer)
 
-        test <@ ``should have consumed all expected messages`` @> // "should have consumed all expected messages"
+        test <@ ``grouped messages``
+                |> Array.forall (fun gp -> gp.Length = messagesPerProducer) @> // "should have consumed all expected messages"
     }
 
 // separated test type to allow the tests to run in parallel

@@ -464,7 +464,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
         let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config.inner, onRevoke = onRevoke)
         let cts = new CancellationTokenSource()
         let triggerStop () =
-            log.Information("Consuming... Stopping {name}", consumer.Name)
+            log.Information("Consuming... Stopping {name:l}", consumer.Name)
             cts.Cancel()
         let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionedCollection partitionHandler |> Async.StartAsTask
         let c = new BatchedConsumer(consumer, task, triggerStop)
