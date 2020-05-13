@@ -16,6 +16,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+### Changed
+### Removed
+### Fixed
+
+<a name="1.4.2"></a>
+## [1.4.2] - 2020-05-13
+
+### Added
 
 - `FsKafka0`: (Moved from [Propulsion.Kafka0](https://github.com/jet/propulsion/tree/ddbcf41072627b26c39ecc915cb747a71ce2a91d/src/Propulsion.Kafka0)) - Implementation of same API as FsKafka based on `Confluent.Kafka` v `0.11.3` [#51](https://github.com/jet/FsKafka/pull/51)
 - `KafkaMonitor` based on [Burrow](https://github.com/linkedin/Burrow) (Moved from [Propulsion.Kafka](https://github.com/jet/propulsion/tree/ddbcf41072627b26c39ecc915cb747a71ce2a91d/src/Propulsion.Kafka) [jet/Propulsion #12](https://github.com/jet/propulsion/pull/12) [#51](https://github.com/jet/FsKafka/pull/51) :pray: [@jgardella](https://github.com/jgardella)
@@ -23,14 +31,12 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Changed
 
-- Target `Confluent.Kafka` / `librdkafka.redist` v `[1.4.2] [#53](https://github.com/jet/FsKafka/pull/53)
+- Target [`Confluent.Kafka`](https://github.com/confluentinc/confluent-kafka-dotnet/releases/tag/v1.4.2) / [`librdkafka.redist`](https://github.com/edenhill/librdkafka/releases/tag/v1.4.2) v `[1.4.2]` [#53](https://github.com/jet/FsKafka/pull/53)
 - `KafkaConsumerConfig.Create`: Made `autoOffsetReset` argument mandatory [#52](https://github.com/jet/FsKafka/pull/52)
 
 ### Removed
 
 - `Config.validateBrokerUri` [#51](https://github.com/jet/FsKafka/pull/51)
-
-### Fixed
 
 <a name="1.4.1"></a>
 ## [1.4.1] - 2020-04-18
@@ -268,8 +274,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.0.rc1...HEAD
-[1.5.0]: https://github.com/jet/FsKafka/compare/1.4.1...1.5.0.rc1
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.2...HEAD
+[1.4.2]: https://github.com/jet/FsKafka/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/jet/FsKafka/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/jet/FsKafka/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/jet/FsKafka/compare/1.2.0...1.3.0

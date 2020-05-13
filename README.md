@@ -7,7 +7,7 @@ F# friendly wrapper for `Confluent.Kafka`, with minimal dependencies or addition
 The components within this repository are delivered as a multi-targeted Nuget package targeting `net461` (F# 3.1+) and `netstandard2.0` (F# 4.5+) profiles
 
 - [![NuGet](https://img.shields.io/nuget/v/FsKafka.svg)](https://www.nuget.org/packages/FsKafka/) `FsKafka`: Wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. [Depends](https://www.fuget.org/packages/FsKafka) on `Confluent.Kafka [1.4.2]`, `librdkafka [1.4.2]` (pinned to ensure we use a tested pairing), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
-- [![NuGet](https://img.shields.io/nuget/v/FsKafka0.svg)](https://www.nuget.org/packages/FsKafka0/) `FsKafka0`: As per `FsKafka`; [Depends](https://www.fuget.org/packages/FsKafka) on *`Confluent.Kafka [0.11.3]`, `librdkafka [0.11.4]`, `Serilog` and `Newtonsoft.Json`.
+- [![NuGet](https://img.shields.io/nuget/v/FsKafka0.svg)](https://www.nuget.org/packages/FsKafka0/) `FsKafka0`: As per `FsKafka`; [Depends](https://www.fuget.org/packages/FsKafka0) on `Confluent.Kafka [0.11.3]`, `librdkafka [0.11.4]`, `Serilog` and `Newtonsoft.Json`.
 
 ## Related repos
 
