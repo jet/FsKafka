@@ -52,6 +52,7 @@ module Config =
         let linger              = mkKey "linger.ms" id<int>
         let messageSendRetries  = mkKey "message.send.max.retries" id<int>
         let partitioner         = mkKey "partitioner" (function Partitioner.Random -> "random" | Partitioner.Consistent -> "consistent" | Partitioner.ConsistentRandom -> "consistent_random")
+        let requestTimeoutMs    = mkKey "request.timeout.ms" id<int>
 
      /// Config keys applying to Consumers
     module Consumer =
@@ -86,6 +87,7 @@ type ProducerConfig() =
     member val LingerMs = Nullable() with get, set
     member val Partitioner = Nullable() with get, set
     member val CompressionType = Nullable() with get, set
+    member val RequestTimeoutMs = Nullable() with get, set
     member val StatisticsIntervalMs = Nullable() with get, set
 
     member __.Render() : KeyValuePair<string,obj>[] =
@@ -100,6 +102,7 @@ type ProducerConfig() =
             match __.LingerMs               with Null -> () | HasValue v -> yield Config.Producer.linger ==> v
             match __.Partitioner            with Null -> () | HasValue v -> yield Config.Producer.partitioner ==> v
             match __.CompressionType        with Null -> () | HasValue v -> yield Config.Producer.compression ==> v
+            match __.RequestTimeoutMs       with Null -> () | HasValue v -> yield Config.Producer.requestTimeoutMs ==> v
             match __.StatisticsIntervalMs   with Null -> () | HasValue v -> yield Config.statisticsInterval ==> v
             yield! values |]
 

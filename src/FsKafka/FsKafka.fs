@@ -37,6 +37,8 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
             ?retryBackoff,
             /// Statistics Interval. Default: no stats.
             ?statisticsInterval,
+            /// Ack timeout (assuming Acks != Acks.0). Confluent.Kafka default: 5s.
+            ?requestTimeout,
             /// Confluent.Kafka default: false. Defaults to true.
             ?socketKeepAlive,
             /// Partition algorithm. Default: `ConsistentRandom`.
@@ -60,6 +62,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         linger |> Option.iter<TimeSpan> (fun x -> c.LingerMs <- Nullable x.TotalMilliseconds) // default 0
         partitioner |> Option.iter (fun x -> c.Partitioner <- Nullable x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
+        requestTimeout |> Option.iter<TimeSpan> (fun x -> c.RequestTimeoutMs <- Nullable (int x.TotalMilliseconds))
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable (int x.TotalMilliseconds))
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter (fun f -> f c)
@@ -204,8 +207,8 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             clientId : string, bootstrapServers : string, topics,
             /// Consumer group identifier.
             groupId,
-            /// Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest. Default: start from Earliest.
-            ?autoOffsetReset,
+            /// Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest.
+            autoOffsetReset,
             /// Default 100kB. Confluent.Kafka default: 500MB
             ?fetchMaxBytes,
             /// Default: use `fetchMaxBytes` value (or its default, 100kB). Confluent.Kafka default: 1mB
@@ -240,7 +243,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             let customPropsDictionary = match config with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
             ConsumerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
                 ClientId=clientId, BootstrapServers=bootstrapServers, GroupId=groupId,
-                AutoOffsetReset = Nullable (defaultArg autoOffsetReset AutoOffsetReset.Earliest), // default: latest
+                AutoOffsetReset = Nullable autoOffsetReset, // default: latest
                 FetchMaxBytes = Nullable fetchMaxBytes, // default: 524_288_000
                 MessageMaxBytes = Nullable (defaultArg messageMaxBytes fetchMaxBytes), // default 1_000_000
                 EnableAutoCommit = Nullable true, // at AutoCommitIntervalMs interval, write value supplied by StoreOffset call
