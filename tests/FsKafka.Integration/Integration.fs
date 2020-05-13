@@ -141,7 +141,7 @@ type T1(testOutputHelper) =
         let consumedBatches = ConcurrentBag<ConsumedTestMessage[]>()
         let consumerCallback (consumer:BatchedConsumer) batch = async {
             do consumedBatches.Add batch
-            let distinct = Seq.collect id consumedBatches |> Seq.map (fun x -> x.payload.messageId) |> Seq.distinct
+            let distinct = Seq.collect id consumedBatches |> Seq.map (fun x -> x.payload.producerId, x.payload.messageId) |> Seq.distinct
             if Seq.length distinct >= numProducers * messagesPerProducer then
                 consumer.Stop()
         }
