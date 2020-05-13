@@ -37,6 +37,8 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
             ?retryBackoff,
             /// Statistics Interval. Default: no stats.
             ?statisticsInterval,
+            /// Ack timeout (assuming Acks != Acks.0). Confluent.Kafka default: 5s.
+            ?requestTimeout,
             /// Confluent.Kafka default: false. Defaults to true.
             ?socketKeepAlive,
             /// Partition algorithm. Default: `ConsistentRandom`.
@@ -60,6 +62,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         linger |> Option.iter<TimeSpan> (fun x -> c.LingerMs <- Nullable x.TotalMilliseconds) // default 0
         partitioner |> Option.iter (fun x -> c.Partitioner <- Nullable x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
+        requestTimeout |> Option.iter<TimeSpan> (fun x -> c.RequestTimeoutMs <- Nullable (int x.TotalMilliseconds))
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable (int x.TotalMilliseconds))
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter (fun f -> f c)
