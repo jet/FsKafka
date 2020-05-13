@@ -204,8 +204,8 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             clientId : string, bootstrapServers : string, topics,
             /// Consumer group identifier.
             groupId,
-            /// Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest. Default: start from Earliest.
-            ?autoOffsetReset,
+            /// Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest.
+            autoOffsetReset,
             /// Default 100kB. Confluent.Kafka default: 500MB
             ?fetchMaxBytes,
             /// Default: use `fetchMaxBytes` value (or its default, 100kB). Confluent.Kafka default: 1mB
@@ -240,7 +240,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             let customPropsDictionary = match config with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
             ConsumerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
                 ClientId=clientId, BootstrapServers=bootstrapServers, GroupId=groupId,
-                AutoOffsetReset = Nullable (defaultArg autoOffsetReset AutoOffsetReset.Earliest), // default: latest
+                AutoOffsetReset = Nullable autoOffsetReset, // default: latest
                 FetchMaxBytes = Nullable fetchMaxBytes, // default: 524_288_000
                 MessageMaxBytes = Nullable (defaultArg messageMaxBytes fetchMaxBytes), // default 1_000_000
                 EnableAutoCommit = Nullable true, // at AutoCommitIntervalMs interval, write value supplied by StoreOffset call
