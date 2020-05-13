@@ -18,7 +18,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 
 - `FsKafka0`: (Moved from [Propulsion.Kafka0](https://github.com/jet/propulsion/tree/ddbcf41072627b26c39ecc915cb747a71ce2a91d/src/Propulsion.Kafka0)) - Implementation of same API as FsKafka based on `Confluent.Kafka` v `0.11.3` [#51](https://github.com/jet/FsKafka/pull/51)
-- `KafkaMonitor` based on [Burrow](https://github.com/linkedin/Burrow) (Moved from [Propulsion.Kafka](https://github.com/jet/propulsion/tree/ddbcf41072627b26c39ecc915cb747a71ce2a91d/src/Propulsion.Kafka) [jet/Propulsion #51](https://github.com/jet/FsKafka/pull/51) [#12](https://github.com/jet/propulsion/pull/12) :pray: [@jgardella](https://github.com/jgardella)
+- `KafkaMonitor` based on [Burrow](https://github.com/linkedin/Burrow) (Moved from [Propulsion.Kafka](https://github.com/jet/propulsion/tree/ddbcf41072627b26c39ecc915cb747a71ce2a91d/src/Propulsion.Kafka) [jet/Propulsion #12](https://github.com/jet/propulsion/pull/12) [#51](https://github.com/jet/FsKafka/pull/51) :pray: [@jgardella](https://github.com/jgardella)
 - `KafkaProducerConfig.Create`: `requestTimeoutMs` [#52](https://github.com/jet/FsKafka/pull/52)
 
 ### Changed
