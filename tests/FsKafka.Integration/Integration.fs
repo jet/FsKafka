@@ -184,10 +184,10 @@ type T1(testOutputHelper) =
         let ``grouped messages`` =
             allMessages
             |> Array.groupBy (fun msg -> msg.payload.producerId)
-            |> Array.map (fun (_, gp) -> gp |> Array.distinctBy (fun msg -> msg.payload.messageId))
+            |> Array.map (fun (_, gp) -> gp |> Array.distinctBy (fun msg -> msg.payload.messageId) |> Array.length)
 
         test <@ ``grouped messages``
-                |> Array.forall (fun gp -> gp.Length = messagesPerProducer) @> // "should have consumed all expected messages"
+                |> Array.forall (fun gmc -> gmc = messagesPerProducer) @> // "should have consumed all expected messages"
     }
 
 // separated test type to allow the tests to run in parallel

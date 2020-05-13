@@ -194,8 +194,8 @@ module Core =
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list; buffering: Core.ConsumerBufferingConfig } with
-    member __.Buffering  = __.buffering
-    member __.Inner  = __.inner
+    member __.Buffering = __.buffering
+    member __.Inner = __.inner
     member __.Topics = __.topics
 
     /// Builds a Kafka Consumer Config suitable for KafkaConsumer.Start*
