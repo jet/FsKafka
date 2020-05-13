@@ -1,5 +1,6 @@
 namespace FsKafka.Integration
 
+open Confluent.Kafka
 open FsKafka
 open Newtonsoft.Json
 open Serilog
@@ -149,7 +150,7 @@ type T1(testOutputHelper) =
         // Section: run the test
         let producers = runProducers log broker topic numProducers messagesPerProducer |> Async.Ignore
 
-        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId, statisticsInterval=(TimeSpan.FromSeconds 5.))
+        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId, AutoOffsetReset.Earliest, statisticsInterval=TimeSpan.FromSeconds 5.)
         let consumers = runConsumers log config numConsumers None consumerCallback
 
         let! _ = [ producers ; consumers ] |> Async.Parallel
@@ -199,7 +200,7 @@ type T2(testOutputHelper) =
 
         let! _ = runProducers log broker topic 1 10 // populate the topic with a few messages
 
-        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId)
+        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId, AutoOffsetReset.Earliest)
         
         let! r = Async.Catch <| runConsumers log config 1 None (fun _ _ -> raise <|IndexOutOfRangeException())
         test <@ match r with Choice2Of2 (:? IndexOutOfRangeException) -> true | x -> failwithf "%A" x @>
@@ -214,7 +215,7 @@ type T2(testOutputHelper) =
 
         let messageCount = ref 0
         let groupId1 = newId()
-        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId1)
+        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId1, AutoOffsetReset.Earliest)
         do! runConsumers log config 1 None 
                 (fun c b -> async { if Interlocked.Add(messageCount, b.Length) >= numMessages then c.Stop() })
 
@@ -222,7 +223,7 @@ type T2(testOutputHelper) =
 
         let messageCount = ref 0
         let groupId2 = newId()
-        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId2)
+        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId2, AutoOffsetReset.Earliest)
         do! runConsumers log config 1 None
                 (fun c b -> async { if Interlocked.Add(messageCount, b.Length) >= numMessages then c.Stop() })
 
@@ -233,7 +234,7 @@ type T2(testOutputHelper) =
         let numMessages = 10
         let topic = newId() // dev kafka topics are created and truncated automatically
         let groupId = newId()
-        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId)
+        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId, AutoOffsetReset.Earliest)
 
         let! _ = runProducers log broker topic 1 numMessages // populate the topic with a few messages
 
@@ -263,7 +264,7 @@ type T3(testOutputHelper) =
         let numMessages = 10
         let topic = newId() // dev kafka topics are created and truncated automatically
         let groupId = newId()
-        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId)
+        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId, AutoOffsetReset.Earliest)
 
         let! _ = runProducers log broker topic 1 numMessages // populate the topic with a few messages
 
@@ -298,7 +299,7 @@ type T3(testOutputHelper) =
         let maxBatchSize = 5
         let topic = newId() // dev kafka topics are created and truncated automatically
         let groupId = newId()
-        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId, maxBatchSize = maxBatchSize)
+        let config = KafkaConsumerConfig.Create("panther", broker, [topic], groupId, AutoOffsetReset.Earliest, maxBatchSize = maxBatchSize)
 
         // Produce messages in the topic
         do! runProducers log broker topic 1 numMessages |> Async.Ignore
