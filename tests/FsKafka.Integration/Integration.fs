@@ -138,12 +138,11 @@ type T1(testOutputHelper) =
         let topic = newId() // dev kafka topics are created and truncated automatically
         let groupId = newId()
     
-        let consumedBatches = new ConcurrentBag<ConsumedTestMessage[]>()
+        let consumedBatches = ConcurrentBag<ConsumedTestMessage[]>()
         let consumerCallback (consumer:BatchedConsumer) batch = async {
             do consumedBatches.Add batch
-            let messageCount = consumedBatches |> Seq.sumBy Array.length
-            // signal cancellation if consumed items reaches expected size
-            if messageCount >= numProducers * messagesPerProducer then
+            let distinct = Seq.collect id consumedBatches |> Seq.map (fun x -> x.payload.messageId) |> Seq.distinct
+            if Seq.length distinct >= numProducers * messagesPerProducer then
                 consumer.Stop()
         }
 
