@@ -1,4 +1,4 @@
-<Project ToolsVersion="15.0">
+<Project>
 
   <Import Project="Directory.Build.props" />
 
@@ -8,16 +8,17 @@
     <PrOption Condition =" '$(BUILD_PR)' != '%24(SYSTEM.PULLREQUEST.PULLREQUESTNUMBER)' ">/p:BUILD_PR=$(BUILD_PR) </PrOption>
     <PackOptions>/p:BUILD_ID=$(BUILD_ID) $(PrOption) -o $(ThisDirAbsolute)bin/nupkg</PackOptions>
 
-    <TestOptions>--logger:trx</TestOptions>
-    <TestOptions Condition=" '$(TargetFrameworks)' != '' ">$(TestOptions) /p:TargetFrameworks=$(TargetFrameworks)</TestOptions>
+    <TestOptions>--logger:trx -- RunConfiguration.TestSessionTimeout=3300000 xunit.diagnosticMessages=true</TestOptions>
   </PropertyGroup>
 
   <Target Name="Pack">
     <Exec Command="dotnet pack src/FsKafka $(Cfg) $(PackOptions)" />
+    <Exec Command="dotnet pack src/FsKafka0 $(Cfg) $(PackOptions)" />
   </Target>
 
   <Target Name="VSTest">
     <Exec Command="dotnet test tests/FsKafka.Integration $(Cfg) $(TestOptions)" />
+    <Exec Command="dotnet test tests/FsKafka0.Integration $(Cfg) $(TestOptions)" />
   </Target>
 
   <Target Name="Build" DependsOnTargets="Pack;VSTest" />

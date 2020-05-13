@@ -7,12 +7,14 @@
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
     <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
     <DefineConstants Condition=" '$(TargetFramework)' == 'net461' ">NET461</DefineConstants>
+    <DefineConstants>$(DefineConstants);KAFKA0</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Infrastructure.fs" />
+    <Compile Include="..\FsKafka\Infrastructure.fs" Link="Infrastructure.fs" />
+    <Compile Include="ConfluentKafkaShims.fs" />
     <Compile Include="FsKafka.fs" />
-    <Compile Include="Monitor.fs" />
+    <Compile Include="..\FsKafka\Monitor.fs" Link="Monitor.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,8 +25,8 @@
     <PackageReference Include="FSharp.Core" Version="4.3.4" Condition=" '$(TargetFramework)' != 'net461' " />
 
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
-    <PackageReference Include="Confluent.Kafka" Version="[1.4.0]" />
-    <PackageReference Include="librdkafka.redist" Version="[1.4.0]" />
+    <PackageReference Include="Confluent.Kafka" Version="[0.11.3]" />
+    <PackageReference Include="librdkafka.redist" Version="[0.11.4]" />
     <PackageReference Include="Serilog" Version="2.7.1" />
   </ItemGroup>
 

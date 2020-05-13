@@ -6,15 +6,16 @@
     <TargetFrameworks Condition=" '$(OS)' != 'Windows_NT' ">netcoreapp3.1</TargetFrameworks>
     <WarningLevel>5</WarningLevel>
     <IsPackable>false</IsPackable>
+    <DefineConstants>KAFKA0</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Integration.fs" />
-    <Compile Include="MonitorTests.fs" />
+    <Compile Include="..\FsKafka.Integration\Integration.fs" Link="Integration.fs" />
+    <Compile Include="..\FsKafka.Integration\MonitorTests.fs" Link="MonitorTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\FsKafka\FsKafka.fsproj" />
+    <ProjectReference Include="..\..\src\FsKafka0\FsKafka0.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

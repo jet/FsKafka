@@ -1,15 +1,14 @@
 name: $(Rev:r)
 
 # Summary:
-#	Linux: Tests with netcoreapp2.1 using docker Kafka instance
-#		net461 on Mono is not working, no investigation why as yet, but local run validates it
+#	Linux: Tests using docker Kafka instance (note test suite does not run net461 as CK on mono is not supported)
 #	Windows: Builds and emits nupkg as artifacts
 #	MacOS: Builds only 
 
 jobs:
 - job: Windows
   pool:
-    vmImage: 'vs2017-win2016'
+    vmImage: 'windows-latest'
   steps:
   - script: dotnet pack build.proj
     displayName: dotnet pack build.proj
@@ -22,33 +21,29 @@ jobs:
       artifactName: 'nupkgs'
 - job: Linux
   pool:
-    vmImage: 'ubuntu-16.04'
+    vmImage: 'ubuntu-latest'
   steps:
-  - script: echo "##vso[task.setvariable variable=FrameworkPathOverride]$(dirname $(which mono))/../lib/mono/4.5/"
-    displayName: Workaround .NET reference assemblies on linux
-  - script: |
-      docker network create kafka-net
-      docker run -d --name zookeeper --network kafka-net --publish 2181:2181 zookeeper:3.4
-      docker run -d --name kafka --network kafka-net --hostname localhost --publish 9092:9092 \
-          --env KAFKA_ADVERTISED_HOST_NAME=127.0.0.1 --env ZOOKEEPER_IP=zookeeper \
-          --env KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
-          ches/kafka
-      sleep 15
-    displayName: Docker kafka for integration tests
-  - script: dotnet test build.proj -v n -p:TargetFrameworks=netcoreapp2.1 # net461 fails
-    displayName: Run Integration tests
-    env:
-      TEST_KAFKA_BROKER: localhost:9092
-  - task: PublishTestResults@2
-    inputs:
-      testResultsFormat: 'VSTest'
-      testResultsFiles: 'tests/**/*.trx'
-    condition: succeededOrFailed()
+    - script: |
+        docker network create kafka-net
+        docker run -d --name zookeeper --network kafka-net --publish 2181:2181 zookeeper:3.4
+        docker run -d --name kafka --network kafka-net --hostname localhost --publish 9092:9092 \
+            --env KAFKA_ADVERTISED_HOST_NAME=127.0.0.1 --env ZOOKEEPER_IP=zookeeper \
+            --env KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
+            ches/kafka
+        sleep 15
+      displayName: Docker kafka for integration tests
+    - script: dotnet test build.proj -v d
+      displayName: Run Integration tests
+      env:
+        TEST_KAFKA_BROKER: localhost:9092
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFormat: 'VSTest'
+        testResultsFiles: 'tests/**/*.trx'
+      condition: succeededOrFailed()
 - job: MacOS
   pool:
     vmImage: 'macOS-latest'
   steps:
-  - script: echo "##vso[task.setvariable variable=FrameworkPathOverride]$(dirname $(which mono))/../lib/mono/4.5/"
-    displayName: Workaround .NET reference assemblies on linux
   - script: dotnet pack build.proj
     displayName: dotnet pack build.proj

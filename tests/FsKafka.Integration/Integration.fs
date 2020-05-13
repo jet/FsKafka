@@ -11,6 +11,20 @@ open System.Threading
 open System.Threading.Tasks
 open Xunit
 
+#if KAFKA0
+type ConsumeResult<'A, 'B> = Confluent.Kafka.Message<'A, 'B>
+#endif
+
+module Config =
+    let validateBrokerUri (broker : Uri) =
+        if not broker.IsAbsoluteUri then invalidArg "broker" "should be of 'host:port' format"
+        if String.IsNullOrEmpty broker.Authority then
+            // handle a corner case in which Uri instances are erroneously putting the hostname in the `scheme` field.
+            if System.Text.RegularExpressions.Regex.IsMatch(string broker, "^\S+:[0-9]+$") then string broker
+            else invalidArg "broker" "should be of 'host:port' format"
+
+        else broker.Authority
+
 [<AutoOpen>]
 [<EditorBrowsable(EditorBrowsableState.Never)>]
 module Helpers =
@@ -84,7 +98,9 @@ module Helpers =
 
     let runConsumers log (config : KafkaConsumerConfig) (numConsumers : int) (timeout : TimeSpan option) (handler : ConsumerCallback) = async {
         let mkConsumer (consumerId : int) = async {
-            let deserialize (result : ConsumeResult<_,_>) = { consumerId = consumerId ; result = result ; payload = JsonConvert.DeserializeObject<_> result.Message.Value }
+            let deserialize result =
+                let message = Binding.message result
+                { consumerId = consumerId ; result = result ; payload = JsonConvert.DeserializeObject<_> message.Value }
 
             // need to pass the consumer instance to the handler callback; perform some cyclic dependency fixups
             let consumerCell = ref None
@@ -109,7 +125,7 @@ module Helpers =
 
 type FactIfBroker() =
     inherit FactAttribute()
-    override __.Skip = if null <> Environment.GetEnvironmentVariable "TEST_KAFKA_BROKER" then null else "Skipping as no EQUINOX_KAFKA_BROKER supplied"
+    override __.Skip = if null <> Environment.GetEnvironmentVariable "TEST_KAFKA_BROKER" then null else "Skipping as no TEST_KAFKA_BROKER supplied"
 
 type T1(testOutputHelper) =
     let log, broker = createLogger (TestOutputAdapter testOutputHelper), getTestBroker ()
@@ -122,12 +138,11 @@ type T1(testOutputHelper) =
         let topic = newId() // dev kafka topics are created and truncated automatically
         let groupId = newId()
     
-        let consumedBatches = new ConcurrentBag<ConsumedTestMessage[]>()
+        let consumedBatches = ConcurrentBag<ConsumedTestMessage[]>()
         let consumerCallback (consumer:BatchedConsumer) batch = async {
             do consumedBatches.Add batch
-            let messageCount = consumedBatches |> Seq.sumBy Array.length
-            // signal cancellation if consumed items reaches expected size
-            if messageCount >= numProducers * messagesPerProducer then
+            let distinct = Seq.collect id consumedBatches |> Seq.map (fun x -> x.payload.producerId, x.payload.messageId) |> Seq.distinct
+            if Seq.length distinct >= numProducers * messagesPerProducer then
                 consumer.Stop()
         }
 
@@ -159,17 +174,19 @@ type T1(testOutputHelper) =
             |> Seq.toArray
 
         let ``all message keys should have expected value`` =
-            allMessages |> Array.forall (fun msg -> int msg.result.Message.Key = msg.payload.messageId)
+            allMessages |> Array.forall (fun msg ->
+                let message = Binding.message msg.result
+                int message.Key = msg.payload.messageId)
 
         test <@ ``all message keys should have expected value`` @> // "all message keys should have expected value"
 
-        let ``should have consumed all expected messages`` =
+        let ``grouped messages`` =
             allMessages
             |> Array.groupBy (fun msg -> msg.payload.producerId)
-            |> Array.map (fun (_, gp) -> gp |> Array.distinctBy (fun msg -> msg.payload.messageId))
-            |> Array.forall (fun gp -> gp.Length = messagesPerProducer)
+            |> Array.map (fun (_, gp) -> gp |> Array.distinctBy (fun msg -> msg.payload.messageId) |> Array.length)
 
-        test <@ ``should have consumed all expected messages`` @> // "should have consumed all expected messages"
+        test <@ ``grouped messages``
+                |> Array.forall (fun gmc -> gmc = messagesPerProducer) @> // "should have consumed all expected messages"
     }
 
 // separated test type to allow the tests to run in parallel
@@ -289,16 +306,16 @@ type T3(testOutputHelper) =
         let globalMessageCount = ref 0
 
         let getPartitionOffset = 
-            let state = new ConcurrentDictionary<int, int64 ref>()
+            let state = ConcurrentDictionary<int, int64 ref>()
             fun partition -> state.GetOrAdd(partition, fun _ -> ref -1L)
 
         let getBatchPartitionCount =
-            let state = new ConcurrentDictionary<int, int ref>()
+            let state = ConcurrentDictionary<int, int ref>()
             fun partition -> state.GetOrAdd(partition, fun _ -> ref 0)
 
         do! runConsumers log config 1 None
                 (fun c b -> async {
-                    let partition = let p = b.[0].result.Partition in p.Value
+                    let partition = Binding.partitionValue b.[0].result.Partition
 
                     // check batch sizes are bounded by maxBatchSize
                     test <@ b.Length <= maxBatchSize @> // "batch sizes should never exceed maxBatchSize")

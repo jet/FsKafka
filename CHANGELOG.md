@@ -16,6 +16,10 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- `FsKafka0`: (Moved from [Propulsion.Kafka0](https://github.com/jet/propulsion/tree/ddbcf41072627b26c39ecc915cb747a71ce2a91d/src/Propulsion.Kafka0)) - Implementation of same API as FsKafka based on `Confluent.Kafka` v `0.11.3` [#51](https://github.com/jet/FsKafka/pull/51)
+- `KafkaMonitor` based on [Burrow](https://github.com/linkedin/Burrow) (Moved from [Propulsion.Kafka](https://github.com/jet/propulsion/tree/ddbcf41072627b26c39ecc915cb747a71ce2a91d/src/Propulsion.Kafka) [#51](https://github.com/jet/FsKafka/pull/51)) [#12](https://github.com/jet/propulsion/pull/12) :pray: [@jgardella](https://github.com/jgardella)
+
 ### Changed
 ### Removed
 ### Fixed
@@ -256,7 +260,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.1...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.0.rc1...HEAD
+[1.5.0]: https://github.com/jet/FsKafka/compare/1.4.1...1.5.0.rc1
 [1.4.1]: https://github.com/jet/FsKafka/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/jet/FsKafka/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/jet/FsKafka/compare/1.2.0...1.3.0
