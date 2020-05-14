@@ -17,7 +17,7 @@ type Partitioner = Random | Consistent | ConsistentRandom
 type AutoOffsetReset = Earliest | Latest | Error
 
 [<RequireQualifiedAccess>]
-module Config =
+module ConfigHelpers =
 
     [<NoComparison; NoEquality>]
     type ConfigKey<'T> = Key of id : string * render : ('T -> obj) with
@@ -88,19 +88,19 @@ type ProducerConfig() =
     member val StatisticsIntervalMs = Nullable() with get, set
 
     member __.Render() : KeyValuePair<string,obj>[] =
-        [|  match __.ClientId               with null -> () | v ->          yield Config.clientId ==> v
-            match __.BootstrapServers       with null -> () | v ->          yield Config.bootstrapServers ==> v
-            match __.RetryBackoffMs         with Null -> () | HasValue v -> yield Config.retryBackoff ==> v
-            match __.MessageSendMaxRetries  with Null -> () | HasValue v -> yield Config.Producer.messageSendRetries ==> v
-            match __.Acks                   with Null -> () | HasValue v -> yield Config.Producer.acks ==> v
-            match __.SocketKeepaliveEnable  with Null -> () | HasValue v -> yield Config.socketKeepAlive ==> v
-            match __.LogConnectionClose     with Null -> () | HasValue v -> yield Config.logConnectionClose ==> v
-            match __.MaxInFlight            with Null -> () | HasValue v -> yield Config.maxInFlight ==> v
-            match __.LingerMs               with Null -> () | HasValue v -> yield Config.Producer.linger ==> v
-            match __.Partitioner            with Null -> () | HasValue v -> yield Config.Producer.partitioner ==> v
-            match __.CompressionType        with Null -> () | HasValue v -> yield Config.Producer.compression ==> v
-            match __.RequestTimeoutMs       with Null -> () | HasValue v -> yield Config.Producer.requestTimeoutMs ==> v
-            match __.StatisticsIntervalMs   with Null -> () | HasValue v -> yield Config.statisticsInterval ==> v
+        [|  match __.ClientId               with null -> () | v ->          yield ConfigHelpers.clientId ==> v
+            match __.BootstrapServers       with null -> () | v ->          yield ConfigHelpers.bootstrapServers ==> v
+            match __.RetryBackoffMs         with Null -> () | HasValue v -> yield ConfigHelpers.retryBackoff ==> v
+            match __.MessageSendMaxRetries  with Null -> () | HasValue v -> yield ConfigHelpers.Producer.messageSendRetries ==> v
+            match __.Acks                   with Null -> () | HasValue v -> yield ConfigHelpers.Producer.acks ==> v
+            match __.SocketKeepaliveEnable  with Null -> () | HasValue v -> yield ConfigHelpers.socketKeepAlive ==> v
+            match __.LogConnectionClose     with Null -> () | HasValue v -> yield ConfigHelpers.logConnectionClose ==> v
+            match __.MaxInFlight            with Null -> () | HasValue v -> yield ConfigHelpers.maxInFlight ==> v
+            match __.LingerMs               with Null -> () | HasValue v -> yield ConfigHelpers.Producer.linger ==> v
+            match __.Partitioner            with Null -> () | HasValue v -> yield ConfigHelpers.Producer.partitioner ==> v
+            match __.CompressionType        with Null -> () | HasValue v -> yield ConfigHelpers.Producer.compression ==> v
+            match __.RequestTimeoutMs       with Null -> () | HasValue v -> yield ConfigHelpers.Producer.requestTimeoutMs ==> v
+            match __.StatisticsIntervalMs   with Null -> () | HasValue v -> yield ConfigHelpers.statisticsInterval ==> v
             yield! values |]
 
 type ConsumerConfig() =
@@ -122,15 +122,15 @@ type ConsumerConfig() =
     member val AutoCommitIntervalMs = Nullable() with get, set
 
     member __.Render() : KeyValuePair<string,obj>[] =
-        [|  match __.ClientId               with null -> () | v ->          yield Config.clientId ==> v
-            match __.BootstrapServers       with null -> () | v ->          yield Config.bootstrapServers ==> v
-            match __.GroupId                with null -> () | v ->          yield Config.Consumer.groupId ==> v
-            match __.AutoOffsetReset        with Null -> () | HasValue v -> yield Config.Consumer.autoOffsetReset ==> v
-            match __.FetchMaxBytes          with Null -> () | HasValue v -> yield Config.Consumer.fetchMaxBytes ==> v
-            match __.LogConnectionClose     with Null -> () | HasValue v -> yield Config.logConnectionClose ==> v
-            match __.EnableAutoCommit       with Null -> () | HasValue v -> yield Config.Consumer.enableAutoCommit ==> v
-            match __.EnableAutoOffsetStore  with Null -> () | HasValue v -> yield Config.Consumer.enableAutoOffsetStore ==> v
-            match __.FetchMinBytes          with Null -> () | HasValue v -> yield Config.Consumer.fetchMinBytes ==> v
-            match __.AutoCommitIntervalMs   with Null -> () | HasValue v -> yield Config.Consumer.autoCommitInterval ==> v
-            match __.StatisticsIntervalMs   with Null -> () | HasValue v -> yield Config.statisticsInterval ==> v
+        [|  match __.ClientId               with null -> () | v ->          yield ConfigHelpers.clientId ==> v
+            match __.BootstrapServers       with null -> () | v ->          yield ConfigHelpers.bootstrapServers ==> v
+            match __.GroupId                with null -> () | v ->          yield ConfigHelpers.Consumer.groupId ==> v
+            match __.AutoOffsetReset        with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.autoOffsetReset ==> v
+            match __.FetchMaxBytes          with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.fetchMaxBytes ==> v
+            match __.LogConnectionClose     with Null -> () | HasValue v -> yield ConfigHelpers.logConnectionClose ==> v
+            match __.EnableAutoCommit       with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.enableAutoCommit ==> v
+            match __.EnableAutoOffsetStore  with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.enableAutoOffsetStore ==> v
+            match __.FetchMinBytes          with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.fetchMinBytes ==> v
+            match __.AutoCommitIntervalMs   with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.autoCommitInterval ==> v
+            match __.StatisticsIntervalMs   with Null -> () | HasValue v -> yield ConfigHelpers.statisticsInterval ==> v
             yield! values |]
