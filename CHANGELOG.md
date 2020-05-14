@@ -13,12 +13,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
-## [Unreleased]
-
-### Added
-### Changed
-### Removed
-### Fixed
+- `FsKafka0`: Rename `Confluent.Kafka.Config` to `ConfigHelpers` to avoid conflict [#54](https://github.com/jet/FsKafka/pull/54)
+- `FsKafka0`: Replace `AutoOffsetReset.None` with `AutoOffsetReset.Error` [#54](https://github.com/jet/FsKafka/pull/54)
 
 <a name="1.4.2"></a>
 ## [1.4.2] - 2020-05-13
