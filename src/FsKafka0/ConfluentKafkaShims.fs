@@ -4,20 +4,17 @@ namespace Confluent.Kafka
 open System
 open System.Collections.Generic
 
-[<AutoOpen>]
-module Types =
+[<RequireQualifiedAccess; Struct>]
+type CompressionType = None | GZip | Snappy | Lz4
 
-    [<RequireQualifiedAccess; Struct>]
-    type CompressionType = None | GZip | Snappy | Lz4
+[<RequireQualifiedAccess; Struct>]
+type Acks = Zero | Leader | All
 
-    [<RequireQualifiedAccess; Struct>]
-    type Acks = Zero | Leader | All
+[<RequireQualifiedAccess; Struct>]
+type Partitioner = Random | Consistent | ConsistentRandom
 
-    [<RequireQualifiedAccess; Struct>]
-    type Partitioner = Random | Consistent | ConsistentRandom
-
-    [<RequireQualifiedAccess; Struct>]
-    type AutoOffsetReset = Earliest | Latest | None
+[<RequireQualifiedAccess; Struct>]
+type AutoOffsetReset = Earliest | Latest | Error
 
 [<RequireQualifiedAccess>]
 module Config =
@@ -57,7 +54,7 @@ module Config =
      /// Config keys applying to Consumers
     module Consumer =
         let autoCommitInterval  = mkKey "auto.commit.interval.ms" id<int>
-        let autoOffsetReset     = mkKey "auto.offset.reset" (function AutoOffsetReset.Earliest -> "earliest" | AutoOffsetReset.Latest -> "latest" | AutoOffsetReset.None -> "none")
+        let autoOffsetReset     = mkKey "auto.offset.reset" (function AutoOffsetReset.Earliest -> "earliest" | AutoOffsetReset.Latest -> "latest" | AutoOffsetReset.Error -> "error")
         let enableAutoCommit    = mkKey "enable.auto.commit" id<bool>
         let enableAutoOffsetStore = mkKey "enable.auto.offset.store" id<bool>
         let groupId             = mkKey "group.id" id<string>
