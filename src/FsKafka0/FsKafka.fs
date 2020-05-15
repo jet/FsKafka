@@ -10,6 +10,11 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 
+type DeliveryReport<'A, 'B> = Message<'A, 'B>
+type DeliveryResult<'A, 'B> = Message<'A, 'B>
+type ConsumeResult<'A, 'B> = Message<'A, 'B>
+type IConsumer<'A, 'B> = Consumer<'A, 'B>
+
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaProducerConfig private (inner, bootstrapServers : string) =
@@ -22,8 +27,10 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
 
     /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
     static member Create
-        (   clientId : string, bootstrapServers : string, acks,
-            /// Message compression. Defaults to None.
+        (   clientId : string, bootstrapServers : string,
+            /// Default: All
+            acks,
+            /// Message compression. Default: None.
             ?compression,
             /// Maximum in-flight requests. Default: 1_000_000.
             /// NB <> 1 implies potential reordering of writes should a batch fail and then succeed in a subsequent retry
@@ -85,7 +92,7 @@ type KafkaProducer private (inner : Producer<string, string>, topic : string, un
     /// <remarks>
     ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
     ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
-    member __.ProduceAsync(key, value) : Async<Message<_,_>> = async {
+    member __.ProduceAsync(key, value) : Async<DeliveryResult<_,_>> = async {
         let! res = inner.ProduceAsync(topic, key = key, ``val`` = value) |> Async.AwaitTaskCorrect
         // Propulsion.Kafka.Producer duplicates this check, but this one should remain for consistency with Confluent.Kafka v1
         if res.Error.HasError then return failwithf "ProduceAsync error %O" res.Error
@@ -113,7 +120,7 @@ type BatchedProducer private (log: ILogger, inner : Producer<string, string>, to
     /// <remarks>
     ///    Note that the delivery and/or write order may vary from the supplied order unless `maxInFlight` is 1 (which massively constrains throughput).
     ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.<remarks/>
-    member __.ProduceBatch(keyValueBatch : (string * string)[]) = async {
+    member __.ProduceBatch(keyValueBatch : (string * string)[]) : Async<DeliveryReport<string,string>[]> = async {
         if Array.isEmpty keyValueBatch then return [||] else
 
         let! ct = Async.CancellationToken
