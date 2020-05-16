@@ -15,7 +15,6 @@ open System.Threading.Tasks
 type KafkaProducerConfig private (inner, bootstrapServers : string) =
     member __.Inner : ProducerConfig = inner
     member __.BootstrapServers = bootstrapServers
-
     member __.Acks = let v = inner.Acks in v.Value
     member __.MaxInFlight = let v = inner.MaxInFlight in v.Value
     member __.Compression = let v = inner.CompressionType in v.GetValueOrDefault(CompressionType.None)
@@ -81,7 +80,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// <remarks>
     ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
     ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
-    member __.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<_,_>> = async {
+    member __.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<string, string>> = async {
         let! ct = Async.CancellationToken
         return! inner.ProduceAsync(topic, message, ct) |> Async.AwaitTaskCorrect }
 
@@ -89,7 +88,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// <remarks>
     ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
     ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
-    member __.ProduceAsync(key, value, ?headers : #seq<string*byte[]>) : Async<DeliveryResult<_,_>> =
+    member __.ProduceAsync(key, value, ?headers : #seq<string*byte[]>) : Async<DeliveryResult<string, string>> =
         let message = Message<_,_>(Key=key, Value=value)
         match headers with
         | None -> ()
@@ -442,7 +441,6 @@ module private ConsumerImpl =
 /// (parallel across partitions, sequenced/monotonic within) batch of processing carried out by the `partitionHandler`
 /// Conclusion of the processing (when a `partitionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
 type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
-
     member __.Inner = inner
 
     interface IDisposable with member __.Dispose() = __.Stop()
