@@ -15,15 +15,16 @@ open System.Threading.Tasks
 type KafkaProducerConfig private (inner, bootstrapServers : string) =
     member __.Inner : ProducerConfig = inner
     member __.BootstrapServers = bootstrapServers
-
     member __.Acks = let v = inner.Acks in v.Value
     member __.MaxInFlight = let v = inner.MaxInFlight in v.Value
     member __.Compression = let v = inner.CompressionType in v.GetValueOrDefault(CompressionType.None)
 
     /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
     static member Create
-        (   clientId : string, bootstrapServers : string, acks,
-            /// Message compression. Defaults to None.
+        (   clientId : string, bootstrapServers : string,
+            /// Default: All
+            acks,
+            /// Message compression. Default: None.
             ?compression,
             /// Maximum in-flight requests. Default: 1_000_000.
             /// NB <> 1 implies potential reordering of writes should a batch fail and then succeed in a subsequent retry
@@ -79,7 +80,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// <remarks>
     ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
     ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
-    member __.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<_,_>> = async {
+    member __.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<string, string>> = async {
         let! ct = Async.CancellationToken
         return! inner.ProduceAsync(topic, message, ct) |> Async.AwaitTaskCorrect }
 
@@ -87,7 +88,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// <remarks>
     ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
     ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
-    member __.ProduceAsync(key, value, ?headers : #seq<string*byte[]>) : Async<DeliveryResult<_,_>> =
+    member __.ProduceAsync(key, value, ?headers : #seq<string*byte[]>) : Async<DeliveryResult<string, string>> =
         let message = Message<_,_>(Key=key, Value=value)
         match headers with
         | None -> ()
@@ -121,7 +122,7 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
     /// <remarks>
     ///    Note that the delivery and/or write order may vary from the supplied order unless `maxInFlight` is 1 (which massively constrains throughput).
     ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.<remarks/>
-    member __.ProduceBatch(keyValueBatch : (string * string)[]) = async {
+    member __.ProduceBatch(keyValueBatch : (string * string)[]) : Async<DeliveryReport<string,string>[]> = async {
         if Array.isEmpty keyValueBatch then return [||] else
 
         let! ct = Async.CancellationToken
@@ -440,7 +441,6 @@ module private ConsumerImpl =
 /// (parallel across partitions, sequenced/monotonic within) batch of processing carried out by the `partitionHandler`
 /// Conclusion of the processing (when a `partitionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
 type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
-
     member __.Inner = inner
 
     interface IDisposable with member __.Dispose() = __.Stop()

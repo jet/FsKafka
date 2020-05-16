@@ -15,9 +15,6 @@ module Binding =
     let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, partition)
     let partitionValue (partition : int) = partition
     let internal offsetUnset = Offset.Invalid
-
-type ConsumeResult<'A, 'B> = Confluent.Kafka.Message<'A, 'B>
-type IConsumer<'A, 'B> = Confluent.Kafka.Consumer<'A, 'B>
 #else
     let message (x : Confluent.Kafka.ConsumeResult<string, string>) = x.Message
     let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, Partition partition)
