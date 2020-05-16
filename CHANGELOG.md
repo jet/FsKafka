@@ -9,11 +9,17 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- `FsKafka0`: Add `IConsumer`, `ConsumeResult`, `DeliveryReport`, `DeliveryResult` aliases [#55](https://github.com/jet/FsKafka/pull/55)
+
 ### Changed
+
+- `FsKafka0`: Rename `Confluent.Kafka.Config` to `ConfigHelpers` to avoid conflict [#54](https://github.com/jet/FsKafka/pull/54)
+- `FsKafka0`: Rename `Confluent.Kafka.Types.*` to `Confluent.Kafka.*` for symmetry [#54](https://github.com/jet/FsKafka/pull/54)
+
 ### Removed
 ### Fixed
 
-- `FsKafka0`: Rename `Confluent.Kafka.Config` to `ConfigHelpers` to avoid conflict [#54](https://github.com/jet/FsKafka/pull/54)
 - `FsKafka0`: Replace `AutoOffsetReset.None` with `AutoOffsetReset.Error` [#54](https://github.com/jet/FsKafka/pull/54)
 
 <a name="1.4.2"></a>
