@@ -10,11 +10,6 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 
-type DeliveryReport<'A, 'B> = Message<'A, 'B>
-type DeliveryResult<'A, 'B> = Message<'A, 'B>
-type ConsumeResult<'A, 'B> = Message<'A, 'B>
-type IConsumer<'A, 'B> = Consumer<'A, 'B>
-
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaProducerConfig private (inner, bootstrapServers : string) =

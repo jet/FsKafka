@@ -4,6 +4,11 @@ namespace Confluent.Kafka
 open System
 open System.Collections.Generic
 
+type DeliveryReport<'A, 'B> = Message<'A, 'B>
+type DeliveryResult<'A, 'B> = Message<'A, 'B>
+type ConsumeResult<'A, 'B> = Message<'A, 'B>
+type IConsumer<'A, 'B> = Consumer<'A, 'B>
+
 [<RequireQualifiedAccess; Struct>]
 type CompressionType = None | GZip | Snappy | Lz4
 
