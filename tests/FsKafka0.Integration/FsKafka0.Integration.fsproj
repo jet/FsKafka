@@ -6,7 +6,6 @@
     <TargetFrameworks Condition=" '$(OS)' != 'Windows_NT' ">netcoreapp3.1</TargetFrameworks>
     <WarningLevel>5</WarningLevel>
     <IsPackable>false</IsPackable>
-    <DefineConstants>KAFKA0</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

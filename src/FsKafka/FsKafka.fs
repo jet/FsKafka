@@ -10,6 +10,14 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 
+module Binding =
+
+    let message (x : Confluent.Kafka.ConsumeResult<string, string>) = x.Message
+    let offsetValue (x : Offset) : int64 = x.Value
+    let partitionValue (x : Partition) : int = x.Value
+    let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, Partition partition)
+    let internal offsetUnset = Offset.Unset
+
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaProducerConfig private (inner, bootstrapServers : string) =
@@ -312,15 +320,15 @@ type ConsumerBuilder =
                         let totalLag = metrics |> Array.sumBy (fun x -> x.consumerLag)
                         log.Information("Consuming... Stats {topic:l} totalLag {totalLag} {@stats}", topic, totalLag, metrics))
             .SetPartitionsAssignedHandler(fun _c xs ->
-                for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
+                for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> Binding.partitionValue p.Partition |]) do
                     log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions))
             .SetPartitionsRevokedHandler(fun _c xs ->
-                for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> let p = p.Partition in p.Value |]) do
+                for topic,partitions in xs |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> Binding.partitionValue p.Partition |]) do
                     log.Information("Consuming... Revoked {topic:l} {partitions}", topic, partitions)
                 onRevoke |> Option.iter (fun f -> f xs))
             .SetOffsetsCommittedHandler(fun _c cos ->
                 for t,ps in cos.Offsets |> Seq.groupBy (fun p -> p.Topic) do
-                    let o = seq { for p in ps -> let pp = p.Partition in pp.Value, OffsetValue.ofOffset p.Offset(*, fmtError p.Error*) }
+                    let o = seq { for p in ps -> Binding.partitionValue p.Partition, OffsetValue.ofOffset p.Offset(*, fmtError p.Error*) }
                     let e = cos.Error
                     if not e.IsError then log.Information("Consuming... Committed {topic} {offsets}", t, o)
                     else log.Warning("Consuming... Committed {topic} {offsets} reason={error} code={code} isBrokerError={isBrokerError}", t, o, e.Reason, e.Code, e.IsBrokerError))
@@ -329,8 +337,10 @@ type ConsumerBuilder =
 module private ConsumerImpl =
     /// guesstimate approximate message size in bytes
     let approximateMessageBytes (result : ConsumeResult<string, string>) =
+        let message = Binding.message result
+        if message = null then invalidOp "Cannot compute size of null message"
         let inline len (x:string) = match x with null -> 0 | x -> sizeof<char> * x.Length
-        16 + len result.Message.Key + len result.Message.Value |> int64
+        16 + len message.Key + len message.Value |> int64
 
     type BlockingCollection<'T> with
         member bc.FillBuffer(buffer : 'T[], maxDelay : TimeSpan) : int =
@@ -405,7 +415,7 @@ module private ConsumerImpl =
                             do! handler batch
 
                             // store completed offsets
-                            let lastItem = batch |> Array.maxBy (fun m -> let o = m.Offset in o.Value)
+                            let lastItem = batch |> Array.maxBy (fun m -> Binding.offsetValue m.Offset)
                             consumer.StoreOffset(lastItem)
 
                             // decrement in-flight message counter

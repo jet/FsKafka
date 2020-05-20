@@ -12,10 +12,6 @@ open System.Threading
 open System.Threading.Tasks
 open Xunit
 
-#if KAFKA0
-type ConsumeResult<'A, 'B> = Confluent.Kafka.Message<'A, 'B>
-#endif
-
 module Config =
     let validateBrokerUri (broker : Uri) =
         if not broker.IsAbsoluteUri then invalidArg "broker" "should be of 'host:port' format"
