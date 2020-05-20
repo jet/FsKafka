@@ -11,9 +11,11 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 
 - `FsKafka0`: Add `IConsumer`, `ConsumeResult`, `DeliveryReport`, `DeliveryResult` aliases [#55](https://github.com/jet/FsKafka/pull/55)
+- Add `Binding.offsetValue` [#56](https://github.com/jet/FsKafka/pull/56)
 
 ### Changed
 
+- Target `Confluent.Kafka [1.4.3]`, `librdkafka.redist [1.4.2]`
 - `FsKafka0`: Rename `Confluent.Kafka.Config` to `ConfigHelpers` to avoid conflict [#54](https://github.com/jet/FsKafka/pull/54)
 - `FsKafka0`: Rename `Confluent.Kafka.Types.*` to `Confluent.Kafka.*` for symmetry [#54](https://github.com/jet/FsKafka/pull/54)
 

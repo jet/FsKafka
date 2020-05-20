@@ -6,7 +6,7 @@ F# friendly wrapper for `Confluent.Kafka`, with minimal dependencies or addition
 
 The components within this repository are delivered as a multi-targeted Nuget package targeting `net461` (F# 3.1+) and `netstandard2.0` (F# 4.5+) profiles
 
-- [![NuGet](https://img.shields.io/nuget/v/FsKafka.svg)](https://www.nuget.org/packages/FsKafka/) `FsKafka`: Wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. [Depends](https://www.fuget.org/packages/FsKafka) on `Confluent.Kafka [1.4.2]`, `librdkafka [1.4.2]` (pinned to ensure we use a tested pairing), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
+- [![NuGet](https://img.shields.io/nuget/v/FsKafka.svg)](https://www.nuget.org/packages/FsKafka/) `FsKafka`: Wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. [Depends](https://www.fuget.org/packages/FsKafka) on `Confluent.Kafka [1.4.3]`, `librdkafka [1.4.2]` (pinned to ensure we use a tested pairing), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
 - [![NuGet](https://img.shields.io/nuget/v/FsKafka0.svg)](https://www.nuget.org/packages/FsKafka0/) `FsKafka0`: As per `FsKafka`; [Depends](https://www.fuget.org/packages/FsKafka0) on `Confluent.Kafka [0.11.3]`, `librdkafka [0.11.4]`, `Serilog` and `Newtonsoft.Json`.
 
 ## Related repos
@@ -76,6 +76,13 @@ The [`v0` branch](tree/v0) continues to house the original code as previously bo
 - upgrading to a new version of `Confluent.Kafka` typically implies a knock on effect from an associated increment in the underlying `rdkafka` driver version (TODO - explain key behavior and perf changes between what  `1.0.0` implies vs `0.11.4`)
 - you'll need to wire the (`Serilog`-based) logging through to your log sink (it's easy to connect it to an NLog Target etc). (The `v0` branch exposes a logging scheme which requires more direct integration)
 - there's an (internal) transitive dependency on `Newtonsoft.Json` v `11.0.2` (which should generally not be a problem to accommodate in most codebases)
+
+### Sounds like a lot of work; surely there's a better way?
+
+The single recommended way to move off a 0.x dependency that uses the older style API is to:
+1. retarget your code to use `FsKafka0`
+2. release, test, validate
+3. retarget your code to use `FsKafka`
 
 ## Minimal producer example
 
