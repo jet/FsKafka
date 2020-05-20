@@ -7,7 +7,6 @@
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
     <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
     <DefineConstants Condition=" '$(TargetFramework)' == 'net461' ">NET461</DefineConstants>
-    <DefineConstants>$(DefineConstants);KAFKA0</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

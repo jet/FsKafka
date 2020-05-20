@@ -3,24 +3,9 @@
 namespace FsKafka
 
 open Confluent.Kafka
-open FsKafka
 open Serilog
 open System
 open System.Diagnostics
-
-module Binding =
-
-#if KAFKA0
-    let message (x : Confluent.Kafka.Message<string, string>) = x
-    let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, partition)
-    let partitionValue (partition : int) = partition
-    let internal offsetUnset = Offset.Invalid
-#else
-    let message (x : Confluent.Kafka.ConsumeResult<string, string>) = x.Message
-    let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, Partition partition)
-    let partitionValue (partition : Partition) = let p = partition in p.Value
-    let internal offsetUnset = Offset.Unset
-#endif
 
 type PartitionResult =
     | OkReachedZero // check 1

@@ -10,6 +10,14 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 
+module Binding =
+
+    let message (x : Confluent.Kafka.Message<string, string>) = x
+    let offsetValue (x : Offset) : int64 = x.Value
+    let partitionValue (partition : int) : int = partition
+    let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, partition)
+    let internal offsetUnset = Offset.Invalid
+
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaProducerConfig private (inner, bootstrapServers : string) =
@@ -300,7 +308,7 @@ type ConsumerBuilder =
             c.Unassign ()
             onRevoke |> Option.iter (fun f -> f tps))
         let d5 = c.OnPartitionEOF.Subscribe(fun tpo ->
-            log.Verbose("Consuming... EOF {topic} partition={partition} offset={offset}", tpo.Topic, tpo.Partition, let o = tpo.Offset in o.Value))
+            log.Verbose("Consuming... EOF {topic} partition={partition} offset={offset}", tpo.Topic, tpo.Partition, Binding.offsetValue tpo.Offset))
         let d6 = c.OnOffsetsCommitted.Subscribe(fun cos ->
             for t,ps in cos.Offsets |> Seq.groupBy (fun p -> p.Topic) do
                 let o = seq { for p in ps -> p.Partition, OffsetValue.ofOffset p.Offset(*, fmtError p.Error*) }
@@ -329,7 +337,9 @@ type ConsumerBuilder =
 module private ConsumerImpl =
 
    /// used for calculating approximate message size in bytes
-    let getMessageSize (message : Message<string, string>) =
+    let getMessageSize (result : Message<string, string>) =
+        let message = Binding.message result
+        if message = null then invalidOp "Cannot compute size of null message"
         let inline len (x:string) = match x with null -> 0 | x -> sizeof<char> * x.Length
         16 + len message.Key + len message.Value |> int64
 
