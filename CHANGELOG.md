@@ -9,6 +9,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+### Changed
+### Removed
+### Fixed
+
+<a name="1.4.3"></a>
+## [1.4.3] - 2020-05-20
+
+### Added
 
 - `FsKafka0`: Add `IConsumer`, `ConsumeResult`, `DeliveryReport`, `DeliveryResult` aliases [#55](https://github.com/jet/FsKafka/pull/55)
 - Add `Binding.offsetValue` [#56](https://github.com/jet/FsKafka/pull/56)
@@ -19,7 +27,6 @@ The `Unreleased` section name is replaced by the expected version of next releas
 - `FsKafka0`: Rename `Confluent.Kafka.Config` to `ConfigHelpers` to avoid conflict [#54](https://github.com/jet/FsKafka/pull/54)
 - `FsKafka0`: Rename `Confluent.Kafka.Types.*` to `Confluent.Kafka.*` for symmetry [#54](https://github.com/jet/FsKafka/pull/54)
 
-### Removed
 ### Fixed
 
 - `FsKafka0`: Replace `AutoOffsetReset.None` with `AutoOffsetReset.Error` [#54](https://github.com/jet/FsKafka/pull/54)
@@ -278,7 +285,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.2...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.3...HEAD
+[1.4.3]: https://github.com/jet/FsKafka/compare/1.4.2...1.4.3
 [1.4.2]: https://github.com/jet/FsKafka/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/jet/FsKafka/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/jet/FsKafka/compare/1.3.0...1.4.0
