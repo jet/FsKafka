@@ -297,7 +297,7 @@ type ConsumerBuilder =
         let d1 = c.OnLog.Subscribe(fun m ->
             log.Information("Consuming... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
         let d2 = c.OnError.Subscribe(fun e ->
-            log.Error("Consuming... Error reason={reason} code={code} broker={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
+            log.Warning("Consuming... Warning reason={reason} code={code} broker={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
         let d3 = c.OnPartitionsAssigned.Subscribe(fun tps ->
             for topic,partitions in tps |> Seq.groupBy (fun p -> p.Topic) |> Seq.map (fun (t,ps) -> t, [| for p in ps -> p.Partition |]) do
                 log.Information("Consuming... Assigned {topic:l} {partitions}", topic, partitions)
@@ -328,7 +328,10 @@ type ConsumerBuilder =
                                     yield kpm |]
                     let totalLag = metrics |> Array.sumBy (fun x -> x.consumerLag)
                     log.Information("Consuming... Stats {topic:l} totalLag {totalLag} {@stats}", topic, totalLag, metrics))
-        fun () -> for d in [d1;d2;d3;d4;d5;d6;d7] do d.Dispose()
+        let d8 = c.OnConsumeError.Subscribe (fun msg ->
+             if msg.Error.HasError then
+                log.Error ("Error reason={reason} topic={topic} partition={partition} offset={offset}", msg.Error.Reason, msg.Topic, msg.Partition, msg.Offset))
+        fun () -> for d in [d1;d2;d3;d4;d5;d6;d7;d8] do d.Dispose()
     static member WithLogging(log : ILogger, config : ConsumerConfig, ?onRevoke) =
         let consumer = new Consumer<_,_>(config.Render(), mkDeserializer(), mkDeserializer())
         let unsubLog = ConsumerBuilder.WithLogging(log, consumer, ?onRevoke = onRevoke)
