@@ -410,6 +410,7 @@ module private ConsumerImpl =
                     try match nextBatch() with
                         | [||] -> ()
                         | batch ->
+                            log.Verbose("Dispatching {count} message(s) to handler", batch.Length)
                             // run the handler function
                             do! handler batch
 
