@@ -148,7 +148,6 @@ type BatchedProducer private (log: ILogger, inner : Producer<string, string>, to
                 member __.HandleDeliveryReport m = handler m }
         for key,value in keyValueBatch do
             inner.ProduceAsync(topic, key, value, blockIfQueueFull = true, deliveryHandler = handler')
-        log.Debug("Produced {count}",!numCompleted)
         return! Async.AwaitTaskCorrect tcs.Task }
 
     /// Creates and wraps a Confluent.Kafka Producer that affords a batched production mode.
