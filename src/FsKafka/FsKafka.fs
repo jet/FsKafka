@@ -9,6 +9,7 @@ open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
+open Serilog.Events
 
 module Binding =
 
@@ -61,13 +62,13 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         let c =
             let customPropsDictionary = match config with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
             ProducerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
-                ClientId = clientId, BootstrapServers = bootstrapServers,
-                RetryBackoffMs = Nullable (match retryBackoff with Some (t : TimeSpan) -> int t.TotalMilliseconds | None -> 1000), // CK default 100ms
-                MessageSendMaxRetries = Nullable (defaultArg retries 60), // default 2
-                Acks = Nullable acks,
-                SocketKeepaliveEnable = Nullable (defaultArg socketKeepAlive true), // default: false
-                LogConnectionClose = Nullable false, // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
-                MaxInFlight = Nullable (defaultArg maxInFlight 1_000_000)) // default 1_000_000
+                ClientId=clientId, BootstrapServers=bootstrapServers,
+                RetryBackoffMs=Nullable (match retryBackoff with Some (t : TimeSpan) -> int t.TotalMilliseconds | None -> 1000), // CK default 100ms
+                MessageSendMaxRetries=Nullable (defaultArg retries 60), // default 2
+                Acks=Nullable acks,
+                SocketKeepaliveEnable=Nullable (defaultArg socketKeepAlive true), // default: false
+                LogConnectionClose=Nullable false, // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
+                MaxInFlight=Nullable (defaultArg maxInFlight 1_000_000)) // default 1_000_000
         linger |> Option.iter<TimeSpan> (fun x -> c.LingerMs <- Nullable x.TotalMilliseconds) // default 0
         partitioner |> Option.iter (fun x -> c.Partitioner <- Nullable x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
@@ -151,9 +152,8 @@ type BatchedProducer private (log: ILogger, inner : IProducer<string, string>, t
                 results.[i - 1] <- m
                 if i = numMessages then tcs.TrySetResult results |> ignore 
         for key,value in keyValueBatch do
-            inner.Produce(topic, Message<_,_>(Key=key, Value=value), deliveryHandler = handler)
+            inner.Produce(topic, Message<_,_>(Key=key, Value=value), deliveryHandler=handler)
         inner.Flush(ct)
-        log.Debug("Produced {count}",!numCompleted)
         return! Async.AwaitTaskCorrect tcs.Task }
 
     /// Creates and wraps a Confluent.Kafka Producer that affords a batched production mode.
@@ -252,12 +252,12 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             let customPropsDictionary = match config with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
             ConsumerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
                 ClientId=clientId, BootstrapServers=bootstrapServers, GroupId=groupId,
-                AutoOffsetReset = Nullable autoOffsetReset, // default: latest
-                FetchMaxBytes = Nullable fetchMaxBytes, // default: 524_288_000
-                MessageMaxBytes = Nullable (defaultArg messageMaxBytes fetchMaxBytes), // default 1_000_000
-                EnableAutoCommit = Nullable true, // at AutoCommitIntervalMs interval, write value supplied by StoreOffset call
-                EnableAutoOffsetStore = Nullable false, // explicit calls to StoreOffset are the only things that effect progression in offsets
-                LogConnectionClose = Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
+                AutoOffsetReset=Nullable autoOffsetReset, // default: latest
+                FetchMaxBytes=Nullable fetchMaxBytes, // default: 524_288_000
+                MessageMaxBytes=Nullable (defaultArg messageMaxBytes fetchMaxBytes), // default 1_000_000
+                EnableAutoCommit=Nullable true, // at AutoCommitIntervalMs interval, write value supplied by StoreOffset call
+                EnableAutoOffsetStore=Nullable false, // explicit calls to StoreOffset are the only things that effect progression in offsets
+                LogConnectionClose=Nullable false) // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
         fetchMinBytes |> Option.iter (fun x -> c.FetchMinBytes <- x) // Fetch waits for this amount of data for up to FetchWaitMaxMs (100)
         autoCommitInterval |> Option.iter<TimeSpan> (fun x -> c.AutoCommitIntervalMs <- Nullable <| int x.TotalMilliseconds)
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable <| int x.TotalMilliseconds)
@@ -304,7 +304,9 @@ type ConsumerBuilder =
     static member WithLogging(log : ILogger, config : ConsumerConfig, ?onRevoke) =
         ConsumerBuilder<_,_>(config)
             .SetLogHandler(fun _c m -> log.Information("Consuming... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
-            .SetErrorHandler(fun _c e -> log.Error("Consuming... Error reason={reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
+            .SetErrorHandler(fun _c e ->
+                let level = if e.IsFatal then LogEventLevel.Error else LogEventLevel.Warning
+                log.Write(level, "Consuming... Error reason={reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
             .SetStatisticsHandler(fun c json -> 
                 // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
                 let stats = JToken.Parse json
@@ -365,7 +367,7 @@ module private ConsumerImpl =
         let createCollection() =
             match perPartitionCapacity with
             | None -> new BlockingCollection<'Message>()
-            | Some c -> new BlockingCollection<'Message>(boundedCapacity = c)
+            | Some c -> new BlockingCollection<'Message>(boundedCapacity=c)
 
         [<CLIEvent>]
         member __.OnPartitionAdded = onPartitionAdded.Publish
@@ -411,6 +413,7 @@ module private ConsumerImpl =
                     try match nextBatch() with
                         | [||] -> ()
                         | batch ->
+                            log.Verbose("Dispatching {count} message(s) to handler", batch.Length)
                             // run the handler function
                             do! handler batch
 
@@ -458,7 +461,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
     member __.Stop() =  triggerStop ()
     /// Inspects current status of processing task
     member __.Status = task.Status
-    member __.RanToCompletion = task.Status = System.Threading.Tasks.TaskStatus.RanToCompletion 
+    member __.RanToCompletion = task.Status = TaskStatus.RanToCompletion
     /// Asynchronously awaits until consumer stops or is faulted
     member __.AwaitCompletion() = Async.AwaitTaskCorrect task
 
@@ -474,7 +477,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
         let onRevoke (xs : seq<TopicPartitionOffset>) = 
             for x in xs do
                 partitionedCollection.Revoke(x.TopicPartition)
-        let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config.inner, onRevoke = onRevoke)
+        let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config.inner, onRevoke=onRevoke)
         let cts = new CancellationTokenSource()
         let triggerStop () =
             log.Information("Consuming... Stopping {name:l}", consumer.Name)

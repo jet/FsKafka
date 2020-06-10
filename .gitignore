@@ -1,3 +1,9 @@
+# OS files
+
+## MacOS
+
+.DS_Store
+
 # Test results
 
 *.trx
