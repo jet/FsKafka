@@ -9,6 +9,7 @@ open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
+open Serilog.Events
 
 module Binding =
 
@@ -304,10 +305,9 @@ type ConsumerBuilder =
         ConsumerBuilder<_,_>(config)
             .SetLogHandler(fun _c m -> log.Information("Consuming... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
             .SetErrorHandler(fun _c e ->
-                if e.IsFatal then
-                    log.Error("Consuming... Error reason={reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError)
-                else
-                    log.Warning("Consuming... Warning reason={reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
+                log.Write((if e.IsFatal then LogEventLevel.Error else LogEventLevel.Warning),
+                           "Consuming... Error reason={reason} code={code} isBrokerError={isBrokerError}",
+                           e.Reason, e.Code, e.IsBrokerError))
             .SetStatisticsHandler(fun c json -> 
                 // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
                 let stats = JToken.Parse json
