@@ -305,9 +305,8 @@ type ConsumerBuilder =
         ConsumerBuilder<_,_>(config)
             .SetLogHandler(fun _c m -> log.Information("Consuming... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
             .SetErrorHandler(fun _c e ->
-                log.Write((if e.IsFatal then LogEventLevel.Error else LogEventLevel.Warning),
-                           "Consuming... Error reason={reason} code={code} isBrokerError={isBrokerError}",
-                           e.Reason, e.Code, e.IsBrokerError))
+                let level = if e.IsFatal then LogEventLevel.Error else LogEventLevel.Warning
+                log.Write(level, "Consuming... Error reason={reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
             .SetStatisticsHandler(fun c json -> 
                 // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
                 let stats = JToken.Parse json
@@ -462,7 +461,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
     member __.Stop() =  triggerStop ()
     /// Inspects current status of processing task
     member __.Status = task.Status
-    member __.RanToCompletion = task.Status = System.Threading.Tasks.TaskStatus.RanToCompletion 
+    member __.RanToCompletion = task.Status = TaskStatus.RanToCompletion
     /// Asynchronously awaits until consumer stops or is faulted
     member __.AwaitCompletion() = Async.AwaitTaskCorrect task
 
