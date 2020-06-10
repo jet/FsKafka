@@ -9,9 +9,18 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- Add `.Verbose` log for handler invocations [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@wantastic84](https://github.com/wantastic84) 
+- FsKafka0: Add ConsumerError logging [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
+
 ### Changed
+
+- FsKafka: Distinguish Fatal Errors from by non-fatal by reducing level to Warning [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
+
 ### Removed
 ### Fixed
+
+- Remove incorrect Producer logging (it logs before the wait hence generally reports 0), as spotted by [@wantastic84](https://github.com/wantastic84) [#57](https://github.com/jet/FsKafka/pull/57)
 
 <a name="1.4.3"></a>
 ## [1.4.3] - 2020-05-20
