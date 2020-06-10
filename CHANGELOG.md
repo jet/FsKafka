@@ -9,6 +9,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+### Changed
+### Removed
+### Fixed
+
+<a name="1.4.4-rc1"></a>
+## [1.4.4-rc1] - 2020-06-10
+
+### Added
 
 - Add `.Verbose` log for handler invocations [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@wantastic84](https://github.com/wantastic84) 
 - FsKafka0: Add ConsumerError logging [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
@@ -17,7 +25,6 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 - FsKafka: Distinguish Fatal Errors from by non-fatal by reducing level to Warning [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
 
-### Removed
 ### Fixed
 
 - Remove incorrect Producer logging (it logs before the wait hence generally reports 0), as spotted by [@wantastic84](https://github.com/wantastic84) [#57](https://github.com/jet/FsKafka/pull/57)
@@ -294,7 +301,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.3...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.4-rc1...HEAD
+[1.4.4-rc1]: https://github.com/jet/FsKafka/compare/1.4.3...1.4.4-rc1
 [1.4.3]: https://github.com/jet/FsKafka/compare/1.4.2...1.4.3
 [1.4.2]: https://github.com/jet/FsKafka/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/jet/FsKafka/compare/1.4.0...1.4.1
