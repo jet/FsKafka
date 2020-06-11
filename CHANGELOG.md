@@ -13,6 +13,11 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+<a name="1.4.4-rc2"></a>
+## [1.4.4-rc2] - 2020-06-11
+
+### Fixed
+
 - `FsKafka0`: remove leak due to incorrect tail-recursion (`do!` -> `return!`) (Clone of `FsKafka` [#39](https://github.com/jet/FsKafka/pull/39)) [#59](https://github.com/jet/FsKafka/pull/59)
 
 <a name="1.4.4-rc1"></a>
@@ -303,7 +308,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.4-rc1...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.4-rc2...HEAD
+[1.4.4-rc2]: https://github.com/jet/FsKafka/compare/1.4.4-rc1...1.4.4-rc2
 [1.4.4-rc1]: https://github.com/jet/FsKafka/compare/1.4.3...1.4.4-rc1
 [1.4.3]: https://github.com/jet/FsKafka/compare/1.4.2...1.4.3
 [1.4.2]: https://github.com/jet/FsKafka/compare/1.4.1...1.4.2

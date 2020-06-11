@@ -328,7 +328,7 @@ type ConsumerBuilder =
                     let totalLag = metrics |> Array.sumBy (fun x -> x.consumerLag)
                     log.Information("Consuming... Stats {topic:l} totalLag {totalLag} {@stats}", topic, totalLag, metrics))
         let d8 = c.OnConsumeError.Subscribe (fun msg ->
-                log.Error("Consuming... Error reason={reason} topic={topic} partition={partition} offset={offset}", msg.Error.Reason, msg.Topic, msg.Partition, msg.Offset))
+            log.Error("Consuming... Error reason={reason} topic={topic} partition={partition} offset={offset}", msg.Error.Reason, msg.Topic, msg.Partition, msg.Offset))
         fun () -> for d in [d1;d2;d3;d4;d5;d6;d7;d8] do d.Dispose()
     static member WithLogging(log : ILogger, config : ConsumerConfig, ?onRevoke) =
         let consumer = new Consumer<_,_>(config.Render(), mkDeserializer(), mkDeserializer())
