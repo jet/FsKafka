@@ -13,6 +13,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+- `FsKafka0`: remove leak due to incorrect tail-recursion (`do!` -> `return!`) (Clone of `FsKafka` [#39](https://github.com/jet/FsKafka/pull/39)) [#59](https://github.com/jet/FsKafka/pull/59)
+
 <a name="1.4.4-rc1"></a>
 ## [1.4.4-rc1] - 2020-06-10
 

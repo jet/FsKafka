@@ -114,10 +114,10 @@ module Helpers =
 
             timeout |> Option.iter consumer.StopAfter
 
-            do! consumer.AwaitCompletion()
+            return! consumer.AwaitCompletion()
         }
 
-        do! Async.Parallel [for i in 1 .. numConsumers -> mkConsumer i] |> Async.Ignore
+        return! Async.Parallel [for i in 1 .. numConsumers -> mkConsumer i] |> Async.Ignore
     }
 
 type FactIfBroker() =
