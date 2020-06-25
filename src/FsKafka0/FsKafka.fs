@@ -421,7 +421,7 @@ module private ConsumerImpl =
         let partitionedCollection = PartitionedBlockingCollection<TopicPartition, Message<string, string>>()
 
         // starts a tail recursive loop which dequeues batches for a given partition buffer and schedules the user callback
-        let consumePartition (_key : TopicPartition) (collection : BlockingCollection<Message<string, string>>) =
+        let consumePartition (key : TopicPartition) (collection : BlockingCollection<Message<string, string>>) =
             let buffer = Array.zeroCreate buf.maxBatchSize
             let nextBatch () =
                 let count = collection.FillBuffer(buffer, buf.maxBatchDelay)
@@ -434,7 +434,8 @@ module private ConsumerImpl =
                     try match nextBatch() with
                         | [||] -> ()
                         | batch ->
-                            log.Verbose("Dispatching {count} message(s) to handler", batch.Length)
+                            use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
+                            log.Debug("Dispatching {count} message(s) to handler", batch.Length)
                             // run the handler function
                             do! handler batch
 
