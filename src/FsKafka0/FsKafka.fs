@@ -421,7 +421,7 @@ module private ConsumerImpl =
         let partitionedCollection = PartitionedBlockingCollection<TopicPartition, Message<string, string>>()
 
         // starts a tail recursive loop which dequeues batches for a given partition buffer and schedules the user callback
-        let consumePartition (key : TopicPartition) (collection : BlockingCollection<Message<string, string>>) =
+        let consumePartition (key : TopicPartition, collection : BlockingCollection<Message<string, string>>) =
             let buffer = Array.zeroCreate buf.maxBatchSize
             let nextBatch () =
                 let count = collection.FillBuffer(buffer, buf.maxBatchDelay)
@@ -452,7 +452,7 @@ module private ConsumerImpl =
 
             Async.Start(loop(), cts.Token)
 
-        use _ = partitionedCollection.OnPartitionAdded.Subscribe (fun (key,buffer) -> consumePartition key buffer)
+        use _ = partitionedCollection.OnPartitionAdded.Subscribe consumePartition
         use _ = consumer.OnPartitionsRevoked.Subscribe (fun ps -> for p in ps do partitionedCollection.Revoke p)
         use _ = consumer.OnMessage.Subscribe (fun m -> counter.Delta(getMessageSize m) ; partitionedCollection.Add(m.TopicPartition, m))
 
