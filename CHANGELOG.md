@@ -9,6 +9,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+### Changed
+### Removed
+### Fixed
+
+<a name="1.4.4-rc3"></a>
+## [1.4.4-rc3] - 2020-06-25
+
+### Added
 
 - include `partition` property as `LogContext.PushProperty` when dispatching a handler invocation [#60](https://github.com/jet/FsKafka/pull/60)
   
@@ -17,7 +25,6 @@ The `Unreleased` section name is replaced by the expected version of next releas
 - Target `Confluent.Kafka [1.4.4-RC1]`, `librdkafka.redist [1.4.4]`
 - Elevated `.Verbose` log for handler invocations from [#57](https://github.com/jet/FsKafka/pull/57) to `.Debug` [#60](https://github.com/jet/FsKafka/pull/60)
 
-### Removed
 ### Fixed
 
 - `FsKafka0`: remove `ObjectDisposedException` when doing > 1 of `.Stop` or `.Dispose` on a Consumer [#60](https://github.com/jet/FsKafka/pull/60)
@@ -317,7 +324,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.4-rc2...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.4-rc3...HEAD
+[1.4.4-rc3]: https://github.com/jet/FsKafka/compare/1.4.4-rc2...1.4.4-rc3
 [1.4.4-rc2]: https://github.com/jet/FsKafka/compare/1.4.4-rc1...1.4.4-rc2
 [1.4.4-rc1]: https://github.com/jet/FsKafka/compare/1.4.3...1.4.4-rc1
 [1.4.3]: https://github.com/jet/FsKafka/compare/1.4.2...1.4.3
