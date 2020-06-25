@@ -9,9 +9,17 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- include `partition` property as `LogContext.PushProperty` when dispatching a handler invocation [#60](https://github.com/jet/FsKafka/pull/60)
+  
 ### Changed
+
+- Elevated `.Verbose` log for handler invocations from [#57](https://github.com/jet/FsKafka/pull/57) to `.Debug` [#60](https://github.com/jet/FsKafka/pull/60)
+
 ### Removed
 ### Fixed
+
+- `FsKafka0`: remove `ObjectDisposedException` when doing > 1 of `.Stop` or `.Dispose` on a Consumer [#60](https://github.com/jet/FsKafka/pull/60)
 
 <a name="1.4.4-rc2"></a>
 ## [1.4.4-rc2] - 2020-06-11
