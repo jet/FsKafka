@@ -399,7 +399,7 @@ module private ConsumerImpl =
         let counter = Core.InFlightMessageCounter(mcLog, buf.minInFlightBytes, buf.maxInFlightBytes)
 
         // starts a tail recursive loop that dequeues batches for a given partition buffer and schedules the user callback
-        let consumePartition (collection : BlockingCollection<ConsumeResult<string, string>>) =
+        let consumePartition (key : TopicPartition, collection : BlockingCollection<ConsumeResult<string, string>>) =
             let buffer = Array.zeroCreate buf.maxBatchSize
             let nextBatch () =
                 let count = collection.FillBuffer(buffer, buf.maxBatchDelay)
@@ -413,7 +413,8 @@ module private ConsumerImpl =
                     try match nextBatch() with
                         | [||] -> ()
                         | batch ->
-                            log.Verbose("Dispatching {count} message(s) to handler", batch.Length)
+                            use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
+                            log.Debug("Dispatching {count} message(s) to handler", batch.Length)
                             // run the handler function
                             do! handler batch
 
@@ -431,7 +432,7 @@ module private ConsumerImpl =
 
             Async.Start(loop(), cts.Token)
 
-        use _ = partitionedCollection.OnPartitionAdded.Subscribe (fun (_key,buffer) -> consumePartition buffer)
+        use _ = partitionedCollection.OnPartitionAdded.Subscribe consumePartition
 
         // run the consumer
         let ct = cts.Token
@@ -480,7 +481,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
         let consumer : IConsumer<string,string> = ConsumerBuilder.WithLogging(log, config.inner, onRevoke=onRevoke)
         let cts = new CancellationTokenSource()
         let triggerStop () =
-            log.Information("Consuming... Stopping {name:l}", consumer.Name)
+            log.Information("Consuming... Stopping {name:l}", config.inner.ClientId) // consumer.Name core dumps on 0.11.3
             cts.Cancel()
         let task = ConsumerImpl.mkBatchedMessageConsumer log config.buffering cts.Token consumer partitionedCollection partitionHandler |> Async.StartAsTask
         let c = new BatchedConsumer(consumer, task, triggerStop)
