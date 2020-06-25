@@ -14,6 +14,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
   
 ### Changed
 
+- Target `Confluent.Kafka [1.4.4-RC1]`, `librdkafka.redist [1.4.4]`
 - Elevated `.Verbose` log for handler invocations from [#57](https://github.com/jet/FsKafka/pull/57) to `.Debug` [#60](https://github.com/jet/FsKafka/pull/60)
 
 ### Removed
