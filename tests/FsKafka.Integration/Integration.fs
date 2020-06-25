@@ -108,7 +108,7 @@ module Helpers =
                 | Some c -> c
 
             let partitionHandler batch = handler (getConsumer()) (Array.map deserialize batch)
-            let consumer = BatchedConsumer.Start(log, config, partitionHandler)
+            use consumer = BatchedConsumer.Start(log, config, partitionHandler)
 
             consumerCell := Some consumer
 
