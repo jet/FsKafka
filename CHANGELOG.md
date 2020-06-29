@@ -10,6 +10,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+
+- Target `Confluent.Kafka [1.4.4]`, `librdkafka.redist [1.4.4]`
+
 ### Removed
 ### Fixed
 
