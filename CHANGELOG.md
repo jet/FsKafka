@@ -10,11 +10,31 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+### Removed
+### Fixed
 
+<a name="1.4.4"></a>
+## [1.4.4] - 2020-06-29
+
+### Added
+
+- Add `.Verbose` log for handler invocations [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@wantastic84](https://github.com/wantastic84) 
+- include `partition` property as `LogContext.PushProperty` when dispatching a handler invocation [#60](https://github.com/jet/FsKafka/pull/60)
+- `FsKafka0`: Add ConsumerError logging [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
+
+### Changed
+
+- `FsKafka`: Distinguish Fatal Errors from by non-fatal by reducing level to Warning [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
 - Target `Confluent.Kafka [1.4.4]`, `librdkafka.redist [1.4.4]`
 
 ### Removed
+
+- Remove incorrect Producer logging (it logs before the wait hence generally reports 0), as spotted by [@wantastic84](https://github.com/wantastic84) [#57](https://github.com/jet/FsKafka/pull/57)
+
 ### Fixed
+
+- `FsKafka0`: remove `ObjectDisposedException` when doing > 1 of `.Stop` or `.Dispose` on a Consumer [#60](https://github.com/jet/FsKafka/pull/60)
+- `FsKafka0`: remove leak due to incorrect tail-recursion (`do!` -> `return!`) (Clone of `FsKafka` [#39](https://github.com/jet/FsKafka/pull/39)) [#59](https://github.com/jet/FsKafka/pull/59)
 
 <a name="1.4.4-rc3"></a>
 ## [1.4.4-rc3] - 2020-06-25
@@ -327,7 +347,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.4-rc3...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.4...HEAD
+[1.4.4]: https://github.com/jet/FsKafka/compare/1.4.4-rc3...1.4.4
 [1.4.4-rc3]: https://github.com/jet/FsKafka/compare/1.4.4-rc2...1.4.4-rc3
 [1.4.4-rc2]: https://github.com/jet/FsKafka/compare/1.4.4-rc1...1.4.4-rc2
 [1.4.4-rc1]: https://github.com/jet/FsKafka/compare/1.4.3...1.4.4-rc1
