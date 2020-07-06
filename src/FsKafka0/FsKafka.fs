@@ -189,11 +189,11 @@ module Core =
         member __.InFlightMb = float inFlightBytes / 1024. / 1024.
         member __.Delta(numBytes : int64) = Interlocked.Add(&inFlightBytes, numBytes) |> ignore
         member __.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
-        member __.AwaitThreshold busyWork =
+        member __.AwaitThreshold(ct: CancellationToken, busyWork) =
             if __.IsOverLimitNow() then
                 log.Information("Consuming... breached in-flight message threshold (now ~{max:n0}B), quiescing until it drops to < ~{min:n1}GB",
                     inFlightBytes, float minInFlightBytes / 1024. / 1024. / 1024.)
-                while Volatile.Read(&inFlightBytes) > minInFlightBytes do
+                while Volatile.Read(&inFlightBytes) > minInFlightBytes && not ct.IsCancellationRequested do
                     busyWork ()
                 log.Verbose "Consumer resuming polling"
 
@@ -362,7 +362,7 @@ module private ConsumerImpl =
         let cts = new CancellationTokenSource()
         let poll() =
             while not cts.IsCancellationRequested do
-                counter.AwaitThreshold(fun () -> Thread.Sleep 5)
+                counter.AwaitThreshold(cts.Token, fun () -> Thread.Sleep 5)
                 consumer.Poll(pollTimeout)
 
         let _ = Async.StartAsTask(async { poll() })
