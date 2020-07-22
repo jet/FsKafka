@@ -10,10 +10,16 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+### Removed
+### Fixed
+
+<a name="1.4.5"></a>
+## [1.4.5] - 2020-07-22
+
+### Changed
 
 - Encapsulated linger/batching semantics in a `Batching` DU passed to `KafkaProducerConfig.Create` (instead of `linger` and `maxInFlight`) in lieu of having `BatchedProducer.CreateWithConfigOverrides` patch the values [#68](https://github.com/jet/FsKafka/pull/68)
 
-### Removed
 ### Fixed
 
 - Handle deadlock between `MaxInflightMessages` wait loop and Consumer cancellation [#61](https://github.com/jet/FsKafka/pull/61) :pray: Bilal Durrani
@@ -353,7 +359,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.4...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.5...HEAD
+[1.4.5]: https://github.com/jet/FsKafka/compare/1.4.4...1.4.5
 [1.4.4]: https://github.com/jet/FsKafka/compare/1.4.4-rc3...1.4.4
 [1.4.4-rc3]: https://github.com/jet/FsKafka/compare/1.4.4-rc2...1.4.4-rc3
 [1.4.4-rc2]: https://github.com/jet/FsKafka/compare/1.4.4-rc1...1.4.4-rc2
