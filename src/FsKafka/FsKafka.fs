@@ -22,7 +22,7 @@ module Binding =
 /// - Latency per produce call
 /// - Using maxInFlight=1 to prevent message sets getting out of order in the case of failure
 type Batching =
-    /// Produce individually, lingering for throughput+compression. Confluent.Kafka < 1.5 default: 0ms. Confluent.Kafka >= 1.5 default: 500ms
+    /// Produce individually, lingering for throughput+compression. Confluent.Kafka < 1.5 default: 0.5ms. Confluent.Kafka >= 1.5 default: 5ms
     | Linger of linger : TimeSpan
     /// Use in conjunction with BatchedProducer.ProduceBatch to to obtain best-effort batching semantics (see comments in BatchedProducer for more detail)
     | BestEffortSerial of linger : TimeSpan
@@ -83,7 +83,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
                 Acks=Nullable acks,
                 SocketKeepaliveEnable=Nullable (defaultArg socketKeepAlive true), // default: false
                 LogConnectionClose=Nullable false, // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
-                LingerMs=Nullable linger.TotalMilliseconds, // default 500 on 1.5, was 0 previously
+                LingerMs=Nullable linger.TotalMilliseconds, // default 5 on >= 1.5.0 (was 0.5 previously)
                 MaxInFlight=Nullable (defaultArg maxInFlight 1_000_000)) // default 1_000_000
         partitioner |> Option.iter (fun x -> c.Partitioner <- Nullable x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
@@ -93,7 +93,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         customize |> Option.iter (fun f -> f c)
         KafkaProducerConfig(c, bootstrapServers)
     /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
-    [<Obsolete "linger is now mandatory as a result of Confluent.Kafka 1.5's changing the default from 0ms to 500ms">]
+    [<Obsolete "linger is now mandatory as a result of Confluent.Kafka 1.5's changing the default from 0.5ms to 5ms">]
     // TODO remove in 2.0.0
     static member Create
         (   clientId : string, bootstrapServers : string,
@@ -126,7 +126,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
             /// Postprocesses the ProducerConfig after the rest of the rules have been applied
             ?customize) =
         KafkaProducerConfig.Create(
-            clientId, bootstrapServers, acks, Custom (defaultArg linger TimeSpan.Zero, defaultArg maxInFlight 1_000_000),
+            clientId, bootstrapServers, acks, Custom (defaultArg linger (TimeSpan.FromMilliseconds 0.5), defaultArg maxInFlight 1_000_000),
             ?compression=compression, ?retries=retries, ?retryBackoff=retryBackoff,
             ?statisticsInterval=statisticsInterval, ?requestTimeout=requestTimeout, ?socketKeepAlive=socketKeepAlive,
             ?partitioner=partitioner, ?config=config, ?custom=custom, ?customize=customize)
