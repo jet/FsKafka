@@ -96,3 +96,35 @@ let producer = KafkaProducer.Create(Serilog.LoggerConfiguration().CreateLogger()
 let key = Guid.NewGuid().ToString()
 let deliveryReport = producer.ProduceAsync(key, "Hello World!") |> Async.RunSynchronously
 ```
+
+## Minimal batched consumer example
+
+```fsharp
+#r "nuget:FsKafka"
+open Confluent.Kafka
+open FsKafka
+
+let handler (messages : ConsumeResult<string,string> []) = async { for m in messages do printfn "Received: %s" m.Message.Value } 
+let consumerConfig = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["topic"], "MyGroupId", AutoOffsetReset.Earliest)
+async {
+    use consumer = BatchedConsumer.Start(Serilog.LoggerConfiguration().CreateLogger(), consumerConfig, handler)
+    return! consumer.AwaitCompletion()
+} |> Async.RunSynchronously
+```
+
+## Minimal batched consumer example with monitor
+
+```fsharp
+#r "nuget:FsKafka"
+open Confluent.Kafka
+open FsKafka
+
+let handler (messages : ConsumeResult<string,string> []) = async { for m in messages do printfn "Received: %s" m.Message.Value } 
+let consumerConfig = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["topic"], "MyGroupId", AutoOffsetReset.Earliest)
+async {
+    let logger = Serilog.LoggerConfiguration().CreateLogger()
+    use consumer = BatchedConsumer.Start(logger, consumerConfig, handler)
+    do! KafkaMonitor(logger).StartAsChild(consumer.Inner, consumerConfig.Inner.GroupId)
+    return! consumer.AwaitCompletion()
+} |> Async.RunSynchronously
+```
