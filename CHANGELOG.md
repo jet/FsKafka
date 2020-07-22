@@ -10,11 +10,15 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
-
-- Target `Confluent.Kafka [1.5.0]`, `librdkafka.redist [1.5.0]`
-
 ### Removed
 ### Fixed
+
+<a name="1.5.0"></a>
+## [1.5.0] - 2020-07-22
+
+### Changed
+
+- Target `Confluent.Kafka [1.5.0]`, `librdkafka.redist [1.5.0]`
 
 <a name="1.4.5"></a>
 ## [1.4.5] - 2020-07-22
@@ -362,7 +366,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.4.5...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.0...HEAD
+[1.5.0]: https://github.com/jet/FsKafka/compare/1.4.5...1.5.0
 [1.4.5]: https://github.com/jet/FsKafka/compare/1.4.4...1.4.5
 [1.4.4]: https://github.com/jet/FsKafka/compare/1.4.4-rc3...1.4.4
 [1.4.4-rc3]: https://github.com/jet/FsKafka/compare/1.4.4-rc2...1.4.4-rc3
