@@ -25,6 +25,7 @@ type Batching =
     /// Produce individually, lingering for throughput+compression. Confluent.Kafka < 1.5 default: 0.5ms. Confluent.Kafka >= 1.5 default: 5ms
     | Linger of linger : TimeSpan
     /// Use in conjunction with BatchedProducer.ProduceBatch to to obtain best-effort batching semantics (see comments in BatchedProducer for more detail)
+    /// Uses maxInFlight=1 batch so failed transmissions should be much less likely to result in broker appending items out of order
     | BestEffortSerial of linger : TimeSpan
     /// Apply custom-defined settings. Not recommended.
     /// NB Having a <> 1 value for maxInFlight runs two risks due to the intrinsic lack of batching mechanisms within the Confluent.Kafka client:
