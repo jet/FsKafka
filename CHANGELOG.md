@@ -13,6 +13,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+- Handle deadlock between `MaxInflightMessages` wait loop and Consumer cancellation [#61](https://github.com/jet/FsKafka/pull/61) :pray: Bilal Durrani
+
 <a name="1.4.4"></a>
 ## [1.4.4] - 2020-06-29
 
