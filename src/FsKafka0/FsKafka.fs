@@ -362,7 +362,7 @@ module private ConsumerImpl =
         let cts = new CancellationTokenSource()
         let poll() =
             while not cts.IsCancellationRequested do
-                counter.AwaitThreshold(cts.Token, fun () -> Thread.Sleep 5)
+                counter.AwaitThreshold(cts.Token, fun () -> Thread.Sleep 1)
                 consumer.Poll(pollTimeout)
 
         let _ = Async.StartAsTask(async { poll() })
