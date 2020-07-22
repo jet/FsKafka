@@ -18,12 +18,27 @@ module Binding =
     let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, partition)
     let internal offsetUnset = Offset.Invalid
 
+/// Defines config/semantics for grouping of messages into message sets in order to balance:
+/// - Latency per produce call
+/// - Using maxInFlight=1 to prevent message sets getting out of order in the case of failure
+type Batching =
+    /// Produce individually, lingering for throughput+compression. Confluent.Kafka < 1.5 default: 0ms. Confluent.Kafka >= 1.5 default: 500ms
+    | Linger of linger : TimeSpan
+    /// Use in conjunction with BatchedProducer.ProduceBatch to to obtain best-effort batching semantics (see comments in BatchedProducer for more detail)
+    | BestEffortSerial of linger : TimeSpan
+    /// Apply custom-defined settings. Not recommended.
+    /// NB Having a <> 1 value for maxInFlight runs two risks due to the intrinsic lack of batching mechanisms within the Confluent.Kafka client:
+    /// 1) items within the initial 'batch' can get written out of order in the face of timeouts and/or retries
+    /// 2) items beyond the linger period may enter a separate batch, which can potentially get scheduled for transmission out of order
+    | Custom of linger : TimeSpan * maxInFlight : int
+
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaProducerConfig private (inner, bootstrapServers : string) =
     member __.Inner : ProducerConfig = inner
     member __.BootstrapServers = bootstrapServers
     member __.Acks = let v = inner.Acks in v.Value
+    member __.Linger = let v = inner.LingerMs in v.Value
     member __.MaxInFlight = let v = inner.MaxInFlight in v.Value
     member __.Compression = let v = inner.CompressionType in v.GetValueOrDefault(CompressionType.None)
 
@@ -32,14 +47,10 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         (   clientId : string, bootstrapServers : string,
             /// Default: All
             acks,
+            /// Defines combination of linger/maxInFlight settings to effect desired batching semantics
+            batching : Batching,
             /// Message compression. Default: None.
             ?compression,
-            /// Maximum in-flight requests. Default: 1_000_000.
-            /// NB <> 1 implies potential reordering of writes should a batch fail and then succeed in a subsequent retry
-            ?maxInFlight,
-            /// Time to wait for other items to be produced before sending a batch. Default: 0ms
-            /// NB the linger setting alone does provide any hard guarantees; see BatchedProducer.CreateWithConfigOverrides
-            ?linger : TimeSpan,
             /// Number of retries. Confluent.Kafka default: 2. Default: 60.
             ?retries,
             /// Backoff interval. Confluent.Kafka default: 100ms. Default: 1s.
@@ -58,6 +69,11 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
             ?custom,
             /// Postprocesses the ProducerConfig after the rest of the rules have been applied
             ?customize) =
+        let linger, maxInFlight =
+            match batching with
+            | Linger l -> l, None
+            | BestEffortSerial l -> l, Some 1
+            | Custom (l,m) -> l, Some m
         let c =
             ProducerConfig(
                 ClientId = clientId, BootstrapServers = bootstrapServers,
@@ -66,9 +82,9 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
                 Acks = Nullable acks,
                 SocketKeepaliveEnable = Nullable (defaultArg socketKeepAlive true), // default: false
                 LogConnectionClose = Nullable false, // https://github.com/confluentinc/confluent-kafka-dotnet/issues/124#issuecomment-289727017
-                MaxInFlight = Nullable (defaultArg maxInFlight 1_000_000)) // default 1_000_000
+                LingerMs=Nullable (int linger.TotalMilliseconds), // default 0 (CK 1.5 makes default 500ms)
+                MaxInFlight=Nullable (defaultArg maxInFlight 1_000_000)) // default 1_000_000
         config |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
-        linger |> Option.iter<TimeSpan> (fun x -> c.LingerMs <- Nullable (int x.TotalMilliseconds)) // default 0
         partitioner |> Option.iter (fun x -> c.Partitioner <- Nullable x)
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
         requestTimeout |> Option.iter<TimeSpan> (fun x -> c.RequestTimeoutMs <- Nullable (int x.TotalMilliseconds))
@@ -76,6 +92,44 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter (fun f -> f c)
         KafkaProducerConfig(c, bootstrapServers)
+    /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
+    [<Obsolete "linger is now mandatory as a result of Confluent.Kafka 1.5's changing the default from 0ms to 500ms">]
+    // TODO remove in 2.0.0
+    static member Create
+        (   clientId : string, bootstrapServers : string,
+            /// Default: All
+            acks,
+            /// Message compression. Default: None.
+            ?compression,
+            /// Maximum in-flight requests. Default: 1_000_000.
+            /// NB <> 1 implies potential reordering of writes should a batch fail and then succeed in a subsequent retry
+            ?maxInFlight,
+            /// Time to wait for other items to be produced before sending a batch. Default: 0ms.
+            /// NB the linger setting alone does provide any hard guarantees; see BatchedProducer.Create/ProduceBatch
+            ?linger : TimeSpan,
+            /// Number of retries. Confluent.Kafka default: 2. Default: 60.
+            ?retries,
+            /// Backoff interval. Confluent.Kafka default: 100ms. Default: 1s.
+            ?retryBackoff,
+            /// Statistics Interval. Default: no stats.
+            ?statisticsInterval,
+            /// Ack timeout (assuming Acks != Acks.0). Confluent.Kafka default: 5s.
+            ?requestTimeout,
+            /// Confluent.Kafka default: false. Defaults to true.
+            ?socketKeepAlive,
+            /// Partition algorithm. Default: `ConsistentRandom`.
+            ?partitioner,
+            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
+            ?config : IDictionary<string,string>,
+            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
+            ?custom,
+            /// Postprocesses the ProducerConfig after the rest of the rules have been applied
+            ?customize) =
+        KafkaProducerConfig.Create(
+            clientId, bootstrapServers, acks, Custom (defaultArg linger TimeSpan.Zero, defaultArg maxInFlight 1_000_000),
+            ?compression=compression, ?retries=retries, ?retryBackoff=retryBackoff,
+            ?statisticsInterval=statisticsInterval, ?requestTimeout=requestTimeout, ?socketKeepAlive=socketKeepAlive,
+            ?partitioner=partitioner, ?config=config, ?custom=custom, ?customize=customize)
 
 [<AutoOpen>]
 module Impl =
@@ -102,14 +156,14 @@ type KafkaProducer private (inner : Producer<string, string>, topic : string, un
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string): KafkaProducer =
         if String.IsNullOrEmpty topic then nullArg "topic"
-        log.Information("Producing... {bootstrapServers} / {topic} compression={compression} maxInFlight={maxInFlight} acks={acks}",
-            config.BootstrapServers, topic, config.Compression, config.MaxInFlight, config.Acks)
+        log.Information("Producing... {bootstrapServers} / {topic} compression={compression} acks={acks} linger={lingerMs}",
+            config.BootstrapServers, topic, config.Compression, config.Acks, config.Linger)
         let p = new Producer<string, string>(config.Inner.Render(), mkSerializer (), mkSerializer())
         let d1 = p.OnLog.Subscribe(fun m -> log.Information("Producing... {message} level={level} name={name} facility={facility}", m.Message, m.Level, m.Name, m.Facility))
         let d2 = p.OnError.Subscribe(fun e -> log.Error("Producing... {reason} code={code} isBrokerError={isBrokerError}", e.Reason, e.Code, e.IsBrokerError))
         new KafkaProducer(p, topic, fun () -> for x in [d1;d2] do x.Dispose())
 
-type BatchedProducer private (log: ILogger, inner : Producer<string, string>, topic : string) =
+type BatchedProducer private (inner : Producer<string, string>, topic : string) =
     member __.Inner = inner
     member __.Topic = topic
 
@@ -150,26 +204,17 @@ type BatchedProducer private (log: ILogger, inner : Producer<string, string>, to
             inner.ProduceAsync(topic, key, value, blockIfQueueFull = true, deliveryHandler = handler')
         return! Async.AwaitTaskCorrect tcs.Task }
 
-    /// Creates and wraps a Confluent.Kafka Producer that affords a batched production mode.
-    /// The default settings represent a best effort at providing batched, ordered delivery semantics
+    /// Creates and wraps a Confluent.Kafka Producer that affords a best effort batched production mode.
     /// NB See caveats on the `ProduceBatch` API for further detail as to the semantics
-    static member CreateWithConfigOverrides
-        (   log : ILogger, config : KafkaProducerConfig, topic : string,
-            /// Default: 1
-            /// NB Having a <> 1 value for maxInFlight runs two risks due to the intrinsic lack of
-            /// batching mechanisms within the Confluent.Kafka client:
-            /// 1) items within the initial 'batch' can get written out of order in the face of timeouts and/or retries
-            /// 2) items beyond the linger period may enter a separate batch, which can potentially get scheduled for transmission out of order
-            ?maxInFlight,
-            /// Having a non-zero linger is critical to items getting into the correct groupings
-            /// (even if it of itself does not guarantee anything based on Kafka's guarantees). Default: 100ms
-            ?linger: TimeSpan) : BatchedProducer =
-        let lingerMs = match linger with Some x -> int x.TotalMilliseconds | None -> 100
-        log.Information("Producing... Using batch Mode with linger={lingerMs}", lingerMs)
-        config.Inner.LingerMs <- Nullable lingerMs
-        config.Inner.MaxInFlight <- Nullable (defaultArg maxInFlight 1)
+    /// Throws ArgumentOutOfRangeException if config has a non-zero linger value as this is absolutely critical to the semantics
+    static member Create(log : ILogger, config : KafkaProducerConfig, topic : string) =
+        match config.Inner.LingerMs, config.Inner.MaxInFlight with
+        | l, _ when l.HasValue && l.Value = 0 -> invalidArg "linger" "A non-zero linger value is required in order to have a hope of batching items"
+        | l, m ->
+            let level = if m.Value = 1 then Serilog.Events.LogEventLevel.Information else Serilog.Events.LogEventLevel.Warning
+            log.Write(level, "Producing... Using batch Mode with linger={lingerMs} maxInFlight={maxInFlight}", l, m)
         let inner = KafkaProducer.Create(log, config, topic)
-        new BatchedProducer(log, inner.Inner, topic)
+        new BatchedProducer(inner.Inner, topic)
 
 module Core =
 
