@@ -10,12 +10,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+
+- Encapsulated linger/batching semantics in a `Batching` DU passed to `KafkaProducerConfig.Create` (instead of `linger` and `maxInFlight`) in lieu of having `BatchedProducer.CreateWithConfigOverrides` patch the values [#68](https://github.com/jet/FsKafka/pull/68)
+
 ### Removed
 ### Fixed
 
 - Handle deadlock between `MaxInflightMessages` wait loop and Consumer cancellation [#61](https://github.com/jet/FsKafka/pull/61) :pray: Bilal Durrani
-- `FsKafka0`: Aligned `Thread.Sleep` when over `maxInFlightBytes` threshold with `FsKafka` (reduced from `5` to `1` ms) 
-
+- `FsKafka0`: Aligned `Thread.Sleep` when over `maxInFlightBytes` threshold with `FsKafka` (reduced from `5` to `1` ms) [#67](https://github.com/jet/FsKafka/pull/67)
 
 <a name="1.4.4"></a>
 ## [1.4.4] - 2020-06-29

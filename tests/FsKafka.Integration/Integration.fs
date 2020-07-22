@@ -25,7 +25,6 @@ module Config =
 [<AutoOpen>]
 [<EditorBrowsable(EditorBrowsableState.Never)>]
 module Helpers =
-    open Confluent.Kafka
 
     // Derived from https://github.com/damianh/CapturingLogOutputWithXunit2AndParallelTests
     // NB VS does not surface these atm, but other test runners / test reports do
@@ -74,8 +73,8 @@ module Helpers =
 
     let runProducers log broker (topic : string) (numProducers : int) (messagesPerProducer : int) = async {
         let runProducer (producerId : int) = async {
-            let cfg = KafkaProducerConfig.Create("panther", broker, Acks.Leader)
-            use producer = BatchedProducer.CreateWithConfigOverrides(log, cfg, topic, maxInFlight = 10000)
+            let cfg = KafkaProducerConfig.Create("panther", broker, Acks.Leader, Batching.Custom (TimeSpan.FromMilliseconds 100., 10_000))
+            use producer = BatchedProducer.Create(log, cfg, topic)
 
             let! results =
                 [1 .. messagesPerProducer]
