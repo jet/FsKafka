@@ -18,7 +18,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Changed
 
-- Target `Confluent.Kafka [1.5.0]`, `librdkafka.redist [1.5.0]`
+- Target [`Confluent.Kafka [1.5.0]`](https://github.com/confluentinc/confluent-kafka-dotnet/releases/tag/v1.5.0), [`librdkafka.redist [1.5.0]`](https://github.com/edenhill/librdkafka/releases/tag/v1.5.0)
 
 <a name="1.4.5"></a>
 ## [1.4.5] - 2020-07-22
