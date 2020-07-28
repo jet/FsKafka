@@ -248,6 +248,12 @@ module Core =
                     busyWork ()
                 log.Verbose "Consumer resuming polling"
 
+module ConsumerDefault =
+    let fetchMaxBytes    = 100_000
+    let maxInFlightBytes = 16L * 1024L * 1024L
+    let maxBatchDelay    = TimeSpan.FromMilliseconds 500.
+    let maxBatchSize     = 1000
+
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list; buffering: Core.ConsumerBufferingConfig } with
@@ -290,9 +296,9 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             ?maxBatchDelay,
             /// Maximum number of messages to group per batch on consumer callbacks for BatchedConsumer. Default 1000.
             ?maxBatchSize) =
-        let maxInFlightBytes = defaultArg maxInFlightBytes (16L * 1024L * 1024L)
+        let maxInFlightBytes = defaultArg maxInFlightBytes ConsumerDefault.maxInFlightBytes
         let minInFlightBytes = defaultArg minInFlightBytes (maxInFlightBytes * 2L / 3L)
-        let fetchMaxBytes = defaultArg fetchMaxBytes 100_000
+        let fetchMaxBytes = defaultArg fetchMaxBytes ConsumerDefault.fetchMaxBytes
         let c =
             let customPropsDictionary = match config with Some x -> x | None -> Dictionary<string,string>() :> IDictionary<string,string>
             ConsumerConfig(customPropsDictionary, // CK 1.2 and later has a default ctor and an IDictionary<string,string> overload
@@ -311,7 +317,8 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
         {   inner = c
             topics = match Seq.toList topics with [] -> invalidArg "topics" "must be non-empty collection" | ts -> ts
             buffering = {
-                maxBatchDelay = defaultArg maxBatchDelay (TimeSpan.FromMilliseconds 500.); maxBatchSize = defaultArg maxBatchSize 1000
+                maxBatchDelay = defaultArg maxBatchDelay ConsumerDefault.maxBatchDelay
+                maxBatchSize = defaultArg maxBatchSize ConsumerDefault.maxBatchSize
                 minInFlightBytes = minInFlightBytes; maxInFlightBytes = maxInFlightBytes } }
 
 // Stats format: https://github.com/edenhill/librdkafka/blob/master/STATISTICS.md
