@@ -445,6 +445,12 @@ module private ConsumerImpl =
         
         let mcLog = log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, Core.Constants.messageCounterSourceContext)
         let counter = Core.InFlightMessageCounter(mcLog, buf.minInFlightBytes, buf.maxInFlightBytes)
+        let busyWork () =
+            let tps = consumer.Assignment
+            // Avoid having our assignments revoked due to MAXPOLL (exceeding max.poll.interval.ms between calls to .Consume)
+            consumer.Pause(tps)
+            let _ = consumer.Consume(1)
+            consumer.Resume(tps)
 
         // starts a tail recursive loop that dequeues batches for a given partition buffer and schedules the user callback
         let consumePartition (key : TopicPartition, collection : BlockingCollection<ConsumeResult<string, string>>) =
@@ -485,7 +491,7 @@ module private ConsumerImpl =
         // run the consumer
         let ct = cts.Token
         try while not ct.IsCancellationRequested do
-                counter.AwaitThreshold(ct, fun () -> Thread.Sleep 1)
+                counter.AwaitThreshold(ct, busyWork)
                 try let result = consumer.Consume(ct) // NB TimeSpan overload yields AVEs on 1.0.0-beta2
                     if result <> null then
                         counter.Delta(+approximateMessageBytes result)
