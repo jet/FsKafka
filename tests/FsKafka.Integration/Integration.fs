@@ -238,7 +238,7 @@ type T2(testOutputHelper) =
         }
 
         use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
-        consumer.StopAfter (TimeSpan.FromSeconds 10.)
+        consumer.StopAfter (TimeSpan.FromSeconds 20.)
         let! res = consumer.AwaitCompletion() |> Async.Catch
         test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
         test <@ receivedAt.Count = count @>

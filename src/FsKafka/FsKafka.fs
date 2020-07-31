@@ -447,7 +447,7 @@ module private ConsumerImpl =
         let counter = Core.InFlightMessageCounter(mcLog, buf.minInFlightBytes, buf.maxInFlightBytes)
         let busyWork () =
             let tps = consumer.Assignment
-//             Avoid having our assignments revoked due to MAXPOLL (exceeding max.poll.interval.ms between calls to .Consume)
+            // Avoid having our assignments revoked due to MAXPOLL (exceeding max.poll.interval.ms between calls to .Consume)
             consumer.Pause(tps)
             let _ = consumer.Consume(1)
             consumer.Resume(tps)
