@@ -249,7 +249,7 @@ module Core =
                     inFlightBytes, float minInFlightBytes / 1024. / 1024.)
                 while Volatile.Read(&inFlightBytes) > minInFlightBytes && not ct.IsCancellationRequested do
                     busyWork ()
-                log.Verbose "Consumer resuming polling"
+                log.Information "Consumer resuming polling"
         member __.AwaitThreshold(ct : CancellationToken, consumer : IConsumer<_,_>) =
             // Avoid having our assignments revoked due to MAXPOLL (exceeding max.poll.interval.ms between calls to .Consume)
             let showConsumerWeAreStillAlive () =

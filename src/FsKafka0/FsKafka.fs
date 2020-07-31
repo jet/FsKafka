@@ -235,13 +235,13 @@ module Core =
         member __.InFlightMb = float inFlightBytes / 1024. / 1024.
         member __.Delta(numBytes : int64) = Interlocked.Add(&inFlightBytes, numBytes) |> ignore
         member __.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
-        member __.AwaitThreshold(ct: CancellationToken, busyWork) =
+        member __.AwaitThreshold(ct : CancellationToken, busyWork) =
             if __.IsOverLimitNow() then
                 log.ForContext("maxB", maxInFlightBytes).Information("Consuming... breached in-flight message threshold (now ~{currentB:n0}B), quiescing until it drops to < ~{minMb:n1}MiB",
                     inFlightBytes, float minInFlightBytes / 1024. / 1024. / 1024.)
                 while Volatile.Read(&inFlightBytes) > minInFlightBytes && not ct.IsCancellationRequested do
                     busyWork ()
-                log.Verbose "Consumer resuming polling"
+                log.Information "Consumer resuming polling"
 
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
