@@ -9,6 +9,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- `KafkaConsumerConfig.Create`: added `allowAutoCreateTopics` argument to enable control of `allow.auto.create.topics` now that `librdkafka 1.5` changes the default [#71](https://github.com/jet/FsKafka/pull/71)
+
 ### Changed
 ### Removed
 ### Fixed
