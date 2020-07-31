@@ -189,9 +189,8 @@ type T1(testOutputHelper) =
 type T2(testOutputHelper) =
     let log, broker = createLogger (TestOutputAdapter testOutputHelper), getTestBroker ()
 
-    let [<FactIfBroker>] ``ConfluentKafka consumer should have expected exception semantics`` () = async {
-        let topic = newId() // dev kafka topics are created and truncated automatically
-        let groupId = newId()
+    let [<FactIfBroker>] ``BatchedConsumer should have expected exception semantics in face of handler exception`` () = async {
+        let topic, groupId = newId(), newId() // dev kafka topics are created and truncated automatically
 
         let! _ = runProducers log broker topic 1 10 // populate the topic with a few messages
 
@@ -199,6 +198,38 @@ type T2(testOutputHelper) =
         
         let! r = Async.Catch <| runConsumers log config 1 None (fun _ _ -> raise <|IndexOutOfRangeException())
         test <@ match r with Choice2Of2 (:? IndexOutOfRangeException) -> true | x -> failwithf "%A" x @>
+    }
+
+    let [<FactIfBroker>] ``BatchedConsumer should have expected quiescing semantics`` () = async {
+        let topic, groupId = newId(), newId() // dev kafka topics are created and truncated automatically
+
+        let producerCfg = KafkaProducerConfig.Create("panther", broker, Acks.Leader, Batching.Linger (TimeSpan.FromMilliseconds 10.))
+        use producer = KafkaProducer.Create(log, producerCfg, topic)
+        let count = 2
+        let value = String('v', 1024)
+        let! _ = Async.Parallel [for key in 1..count do producer.ProduceAsync(string key, value) ]
+
+        let consumerCfg =
+            KafkaConsumerConfig.Create(
+                "panther", broker, [topic], groupId, AutoOffsetReset.Earliest,
+                fetchMaxBytes=1000,
+                customize=fun c -> c.MaxPollIntervalMs <- Nullable 1_000)
+        let timer = System.Diagnostics.Stopwatch.StartNew()
+        let receivedAt = ConcurrentQueue()
+        let handle messages = async {
+            for r in messages do
+                let m = Binding.message r
+                log.Information("Received {key} at {time}", m.Key, timer.ElapsedMilliseconds)
+            receivedAt.Enqueue timer.ElapsedMilliseconds
+            if receivedAt.Count < count then do! Async.Sleep 1_500
+            else raise <| Exception "Completed"
+        }
+
+        use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
+        consumer.StopAfter (TimeSpan.FromSeconds 10.)
+        let! res = consumer.AwaitCompletion() |> Async.Catch
+        test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
+        test <@ receivedAt.Count = count @>
     }
 
     let [<FactIfBroker>] ``Given a topic different consumer group ids should be consuming the same message set`` () = async {
@@ -255,7 +286,7 @@ type T2(testOutputHelper) =
 type T3(testOutputHelper) =
     let log, broker = createLogger (TestOutputAdapter testOutputHelper), getTestBroker ()
 
-    let [<FactIfBroker>] ``Commited offsets should not result in missing messages`` () = async {
+    let [<FactIfBroker>] ``Committed offsets should not result in missing messages`` () = async {
         let numMessages = 10
         let topic = newId() // dev kafka topics are created and truncated automatically
         let groupId = newId()
