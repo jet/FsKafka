@@ -205,9 +205,8 @@ type T2(testOutputHelper) =
 
         let producerCfg = KafkaProducerConfig.Create("panther", broker, Acks.Leader, Batching.Linger (TimeSpan.FromMilliseconds 10.))
         use producer = KafkaProducer.Create(log, producerCfg, topic)
-        let count = 2
         let value = String('v', 1024)
-        let keys = set [for x in 1..count -> string x]
+        let keys = set [for x in 1..2 -> string x]
         let! _ = Async.Parallel [for key in keys do producer.ProduceAsync(key, value) ]
 
         let consumerCfg =
@@ -235,7 +234,7 @@ type T2(testOutputHelper) =
             | 1L ->
                 // Drive the quiescing period over the MaxPollInterval
                 do! Async.Sleep 10_500
-            | _ when received.Count < count ->
+            | _ when received.Count < keys.Count ->
                 ()
             | _ ->
                 failwith "Completed"
@@ -245,7 +244,7 @@ type T2(testOutputHelper) =
         consumer.StopAfter (TimeSpan.FromSeconds 20.)
         let! res = consumer.AwaitCompletion() |> Async.Catch
         test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
-        test <@ received.Count = count && set (Seq.map fst received) = keys @>
+        test <@ set (Seq.map fst received) = keys @>
     }
 
     let [<FactIfBroker>] ``Given a topic different consumer group ids should be consuming the same message set`` () = async {
