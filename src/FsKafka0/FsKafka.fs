@@ -237,7 +237,7 @@ module Core =
         member __.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
         member __.AwaitThreshold(ct: CancellationToken, busyWork) =
             if __.IsOverLimitNow() then
-                log.Information("Consuming... breached in-flight message threshold (now ~{max:n0}B), quiescing until it drops to < ~{min:n1}GB",
+                log.ForContext("maxB", maxInFlightBytes).Information("Consuming... breached in-flight message threshold (now ~{currentB:n0}B), quiescing until it drops to < ~{minMb:n1}MiB",
                     inFlightBytes, float minInFlightBytes / 1024. / 1024. / 1024.)
                 while Volatile.Read(&inFlightBytes) > minInFlightBytes && not ct.IsCancellationRequested do
                     busyWork ()
