@@ -91,10 +91,14 @@ The single recommended way to move off a 0.x dependency that uses the older styl
 open Confluent.Kafka
 open FsKafka
 
-let producerConfig = KafkaProducerConfig.Create("MyClientId", "kafka:9092", Acks.All)
-let producer = KafkaProducer.Create(Serilog.LoggerConfiguration().CreateLogger(), producerConfig, "MyTopic")   
+let log = Serilog.LoggerConfiguration().CreateLogger()
+
+let batching = Batching.Linger (System.TimeSpan.FromMilliseconds 10.)
+let producerConfig = KafkaProducerConfig.Create("MyClientId", "kafka:9092", Acks.All, batching)
+let producer = KafkaProducer.Create(log, producerConfig, "MyTopic")
+   
 let key = Guid.NewGuid().ToString()
-let deliveryReport = producer.ProduceAsync(key, "Hello World!") |> Async.RunSynchronously
+let deliveryResult = producer.ProduceAsync(key, "Hello World!") |> Async.RunSynchronously
 ```
 
 ## Minimal batched consumer example
@@ -104,10 +108,17 @@ let deliveryReport = producer.ProduceAsync(key, "Hello World!") |> Async.RunSync
 open Confluent.Kafka
 open FsKafka
 
-let handler (messages : ConsumeResult<string,string> []) = async { for m in messages do printfn "Received: %s" m.Message.Value } 
-let consumerConfig = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["topic"], "MyGroupId", AutoOffsetReset.Earliest)
+let log = Serilog.LoggerConfiguration().CreateLogger()
+
+let handler (messages : ConsumeResult<string,string> []) = async {
+    for m in messages do
+        printfn "Received: %s" m.Message.Value
+} 
+
+let cfg = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["MyTopic"], "MyGroupId", AutoOffsetReset.Earliest)
+
 async {
-    use consumer = BatchedConsumer.Start(Serilog.LoggerConfiguration().CreateLogger(), consumerConfig, handler)
+    use consumer = BatchedConsumer.Start(log, cfg, handler)
     return! consumer.AwaitCompletion()
 } |> Async.RunSynchronously
 ```
@@ -119,12 +130,18 @@ async {
 open Confluent.Kafka
 open FsKafka
 
-let handler (messages : ConsumeResult<string,string> []) = async { for m in messages do printfn "Received: %s" m.Message.Value } 
-let consumerConfig = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["topic"], "MyGroupId", AutoOffsetReset.Earliest)
+let log = Serilog.LoggerConfiguration().CreateLogger()
+
+let handler (messages : ConsumeResult<string,string> []) = async {
+    for m in messages do
+        printfn "Received: %s" m.Message.Value
+} 
+
+let cfg = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["MyTopic"], "MyGroupId", AutoOffsetReset.Earliest)
+
 async {
-    let logger = Serilog.LoggerConfiguration().CreateLogger()
-    use consumer = BatchedConsumer.Start(logger, consumerConfig, handler)
-    do! KafkaMonitor(logger).StartAsChild(consumer.Inner, consumerConfig.Inner.GroupId)
+    use consumer = BatchedConsumer.Start(log, cfg, handler)
+    do! KafkaMonitor(log).StartAsChild(consumer.Inner, cfg.Inner.GroupId)
     return! consumer.AwaitCompletion()
 } |> Async.RunSynchronously
 ```
