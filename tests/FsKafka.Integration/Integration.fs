@@ -207,7 +207,8 @@ type T2(testOutputHelper) =
         use producer = KafkaProducer.Create(log, producerCfg, topic)
         let count = 2
         let value = String('v', 1024)
-        let! _ = Async.Parallel [for key in 1..count do producer.ProduceAsync(string key, value) ]
+        let keys = set [for x in 1..count -> string x]
+        let! _ = Async.Parallel [for key in keys do producer.ProduceAsync(key, value) ]
 
         let consumerCfg =
             KafkaConsumerConfig.Create(
@@ -223,18 +224,18 @@ type T2(testOutputHelper) =
 #endif
                 )
         let timer = System.Diagnostics.Stopwatch.StartNew()
-        let receivedAt = ConcurrentQueue()
+        let received = ConcurrentQueue()
         let callCount = ref 0L
         let handle messages = async {
             for r in messages do
                 let m = Binding.message r
                 log.Information("Received {key} at {time}", m.Key, timer.ElapsedMilliseconds)
-                receivedAt.Enqueue timer.ElapsedMilliseconds
+                received.Enqueue((m.Key, timer.ElapsedMilliseconds))
             match Interlocked.Increment callCount with
             | 1L ->
                 // Drive the quiescing period over the MaxPollInterval
                 do! Async.Sleep 10_500
-            | _ when receivedAt.Count < count ->
+            | _ when received.Count < count ->
                 ()
             | _ ->
                 failwith "Completed"
@@ -244,7 +245,7 @@ type T2(testOutputHelper) =
         consumer.StopAfter (TimeSpan.FromSeconds 20.)
         let! res = consumer.AwaitCompletion() |> Async.Catch
         test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
-        test <@ receivedAt.Count <> count @>
+        test <@ received.Count = count && set (Seq.map fst received) = keys @>
     }
 
     let [<FactIfBroker>] ``Given a topic different consumer group ids should be consuming the same message set`` () = async {
