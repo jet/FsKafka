@@ -215,7 +215,7 @@ type T2(testOutputHelper) =
                 fetchMaxBytes=1000,
                 customize=fun c ->
                     c.MaxPollIntervalMs <- Nullable 10_000
-                    c.SessionTimeoutMs <- Nullable 5_000)
+                    c.SessionTimeoutMs <- Nullable 6_000)
         let timer = System.Diagnostics.Stopwatch.StartNew()
         let receivedAt = ConcurrentQueue()
         let callCount = ref 0L
