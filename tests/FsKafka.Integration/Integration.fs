@@ -214,17 +214,24 @@ type T2(testOutputHelper) =
                 "panther", broker, [topic], groupId, AutoOffsetReset.Earliest,
                 fetchMaxBytes=1000,
                 customize=fun c ->
-                    c.MaxPollIntervalMs <- Nullable 1_000
-                    c.SessionTimeoutMs <- Nullable 500)
+                    c.MaxPollIntervalMs <- Nullable 10_000
+                    c.SessionTimeoutMs <- Nullable 5_000)
         let timer = System.Diagnostics.Stopwatch.StartNew()
         let receivedAt = ConcurrentQueue()
+        let callCount = ref 0L
         let handle messages = async {
             for r in messages do
                 let m = Binding.message r
                 log.Information("Received {key} at {time}", m.Key, timer.ElapsedMilliseconds)
-            receivedAt.Enqueue timer.ElapsedMilliseconds
-            if receivedAt.Count < count then do! Async.Sleep 1_500
-            else raise <| Exception "Completed"
+                receivedAt.Enqueue timer.ElapsedMilliseconds
+            match Interlocked.Increment callCount with
+            | 1L ->
+                // Drive the quiescing period over the MaxPollInterval
+                do! Async.Sleep 10_500
+            | _ when receivedAt.Count < count ->
+                ()
+            | _ ->
+                raise <| Exception "Completed"
         }
 
         use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
