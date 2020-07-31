@@ -58,6 +58,7 @@ module ConfigHelpers =
 
      /// Config keys applying to Consumers
     module Consumer =
+        let allowAutoCreateTopics = mkKey "allow.auto.create.topics" id<bool>
         let autoCommitInterval  = mkKey "auto.commit.interval.ms" id<int>
         let autoOffsetReset     = mkKey "auto.offset.reset" (function AutoOffsetReset.Earliest -> "earliest" | AutoOffsetReset.Latest -> "latest" | AutoOffsetReset.Error -> "error")
         let enableAutoCommit    = mkKey "enable.auto.commit" id<bool>
@@ -124,6 +125,7 @@ type ConsumerConfig() =
     member val LogConnectionClose = Nullable() with get, set
     member val FetchMinBytes = Nullable() with get, set
     member val StatisticsIntervalMs = Nullable() with get, set
+    member val AllowAutoCreateTopics = Nullable() with get, set
     member val AutoCommitIntervalMs = Nullable() with get, set
 
     member __.Render() : KeyValuePair<string,obj>[] =
@@ -136,6 +138,7 @@ type ConsumerConfig() =
             match __.EnableAutoCommit       with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.enableAutoCommit ==> v
             match __.EnableAutoOffsetStore  with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.enableAutoOffsetStore ==> v
             match __.FetchMinBytes          with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.fetchMinBytes ==> v
+            match __.AllowAutoCreateTopics  with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.allowAutoCreateTopics ==> v
             match __.AutoCommitIntervalMs   with Null -> () | HasValue v -> yield ConfigHelpers.Consumer.autoCommitInterval ==> v
             match __.StatisticsIntervalMs   with Null -> () | HasValue v -> yield ConfigHelpers.statisticsInterval ==> v
             yield! values |]
