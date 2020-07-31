@@ -214,11 +214,12 @@ type T2(testOutputHelper) =
                 "panther", broker, [topic], groupId, AutoOffsetReset.Earliest,
                 maxInFlightBytes=1_000L,
                 customize=fun c ->
+#if !KAFKA0
                     // these properties are not implemented in FsKafka0
-                    // c.MaxPollIntervalMs <- Nullable 10_000 // Default is 5m, needs to exceed SessionTimeoutMs
-                    // c.SessionTimeoutMs <- Nullable 6_000 // Broker default min value is 6000
-                    c.Set("max.poll.interval.ms", "10000")
-                    c.Set("session.timeout.ms", "6000"))
+                    c.MaxPollIntervalMs <- Nullable 10_000 // Default is 5m, needs to exceed SessionTimeoutMs
+                    c.SessionTimeoutMs <- Nullable 6_000 // Broker default min value is 6000
+#endif
+                )
         let timer = System.Diagnostics.Stopwatch.StartNew()
         let receivedAt = ConcurrentQueue()
         let callCount = ref 0L
@@ -234,14 +235,14 @@ type T2(testOutputHelper) =
             | _ when receivedAt.Count < count ->
                 ()
             | _ ->
-                raise <| Exception "Completed"
+                failwith "Completed"
         }
 
         use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
         consumer.StopAfter (TimeSpan.FromSeconds 20.)
         let! res = consumer.AwaitCompletion() |> Async.Catch
         test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
-        test <@ receivedAt.Count = count @>
+        test <@ receivedAt.Count <> count @>
     }
 
     let [<FactIfBroker>] ``Given a topic different consumer group ids should be consuming the same message set`` () = async {
