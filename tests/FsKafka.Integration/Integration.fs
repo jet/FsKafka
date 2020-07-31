@@ -242,7 +242,7 @@ type T2(testOutputHelper) =
         consumer.StopAfter (TimeSpan.FromSeconds 20.)
         let! res = consumer.AwaitCompletion() |> Async.Catch
         test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
-        test <@ receivedAt.Count <> count @>
+        test <@ receivedAt.Count = count @>
     }
 
     let [<FactIfBroker>] ``Given a topic different consumer group ids should be consuming the same message set`` () = async {
