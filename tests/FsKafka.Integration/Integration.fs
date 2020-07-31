@@ -213,7 +213,9 @@ type T2(testOutputHelper) =
             KafkaConsumerConfig.Create(
                 "panther", broker, [topic], groupId, AutoOffsetReset.Earliest,
                 fetchMaxBytes=1000,
-                customize=fun c -> c.MaxPollIntervalMs <- Nullable 1_000)
+                customize=fun c ->
+                    c.MaxPollIntervalMs <- Nullable 1_000
+                    c.SessionTimeoutMs <- Nullable 500)
         let timer = System.Diagnostics.Stopwatch.StartNew()
         let receivedAt = ConcurrentQueue()
         let handle messages = async {
