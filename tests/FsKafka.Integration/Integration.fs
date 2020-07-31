@@ -212,10 +212,13 @@ type T2(testOutputHelper) =
         let consumerCfg =
             KafkaConsumerConfig.Create(
                 "panther", broker, [topic], groupId, AutoOffsetReset.Earliest,
-                fetchMaxBytes=1000,
+                maxInFlightBytes=1_000L,
                 customize=fun c ->
-                    c.MaxPollIntervalMs <- Nullable 10_000
-                    c.SessionTimeoutMs <- Nullable 6_000)
+                    // these properties are not implemented in FsKafka0
+                    // c.MaxPollIntervalMs <- Nullable 10_000 // Default is 5m, needs to exceed SessionTimeoutMs
+                    // c.SessionTimeoutMs <- Nullable 6_000 // Broker default min value is 6000
+                    c.Set("max.poll.interval.ms", "10000")
+                    c.Set("session.timeout.ms", "6000"))
         let timer = System.Diagnostics.Stopwatch.StartNew()
         let receivedAt = ConcurrentQueue()
         let callCount = ref 0L
