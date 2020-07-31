@@ -15,6 +15,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 ### Changed
 ### Removed
+
+- Obsoleted deprecation overload of `KafkaProducerConfig.Create` introduced in 1.5.0
+
 ### Fixed
 
 <a name="1.5.6"></a>

@@ -91,42 +91,6 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter (fun f -> f c)
         KafkaProducerConfig(c, bootstrapServers)
-    /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
-    [<Obsolete "linger is now mandatory as a result of Confluent.Kafka 1.5's changing the default from 0.5ms to 5ms">]
-    // TODO remove in 2.0.0
-    static member Create
-        (   clientId : string, bootstrapServers : string, acks,
-            /// Message compression. Default: None.
-            ?compression,
-            /// Maximum in-flight requests. Default: 1_000_000.
-            /// NB <> 1 implies potential reordering of writes should a batch fail and then succeed in a subsequent retry
-            ?maxInFlight,
-            /// Time to wait for other items to be produced before sending a batch. Default: 0ms.
-            /// NB the linger setting alone does provide any hard guarantees; see BatchedProducer.Create/ProduceBatch
-            ?linger : TimeSpan,
-            /// Number of retries. Confluent.Kafka default: 2. Default: 60.
-            ?retries,
-            /// Backoff interval. Confluent.Kafka default: 100ms. Default: 1s.
-            ?retryBackoff,
-            /// Statistics Interval. Default: no stats.
-            ?statisticsInterval,
-            /// Ack timeout (assuming Acks != Acks.0). Confluent.Kafka default: 5s.
-            ?requestTimeout,
-            /// Confluent.Kafka default: false. Defaults to true.
-            ?socketKeepAlive,
-            /// Partition algorithm. Default: `ConsistentRandom`.
-            ?partitioner,
-            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
-            ?config : IDictionary<string,string>,
-            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
-            ?custom,
-            /// Postprocesses the ProducerConfig after the rest of the rules have been applied
-            ?customize) =
-        KafkaProducerConfig.Create(
-            clientId, bootstrapServers, acks, Custom (defaultArg linger (TimeSpan.FromMilliseconds 0.5), defaultArg maxInFlight 1_000_000),
-            ?compression=compression, ?retries=retries, ?retryBackoff=retryBackoff,
-            ?statisticsInterval=statisticsInterval, ?requestTimeout=requestTimeout, ?socketKeepAlive=socketKeepAlive,
-            ?partitioner=partitioner, ?config=config, ?custom=custom, ?customize=customize)
 
 /// Creates and wraps a Confluent.Kafka Producer with the supplied configuration
 type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
@@ -483,10 +447,10 @@ module private ConsumerImpl =
                         counter.Delta(-batchSize)
                 with e ->
                     log.ForContext("batchSize", batchSize).ForContext("batchLen", batchLen).ForContext("handlerDuration", batchWatch.Elapsed)
-                        .Information(e, "Exiting batch processing loop due to handler exception") 
+                        .Information(e, "Exiting batch processing loop due to handler exception")
                     tcs.TrySetException e |> ignore
                     cts.Cancel() }
-            
+
             let loop = async {
                 use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
                 while not collection.IsCompleted do
