@@ -13,6 +13,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+### Changed
+### Removed
+### Fixed
+
+<a name="1.5.1"></a>
+## [1.5.1] - 2020-08-04
+
+### Added
 
 - BREAKING: `KafkaConsumerConfig.Create`: added `allowAutoCreateTopics` argument to enable control of `allow.auto.create.topics` now that `librdkafka 1.5` changes the default [#71](https://github.com/jet/FsKafka/pull/71)
 
@@ -20,8 +28,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 - Changed unit of `maxInFlightBytes` when rendered in logs from GiB to MiB [#72](https://github.com/jet/FsKafka/pull/72)
 
-### Removed
 ### Fixed
+
+- Applied `Pause`/`Resume` when consumer quiesces due to `maxInFlightBytes` to avoid `MAXPOLL` condition (not implemented for `FsKafka0`) [#70](https://github.com/jet/FsKafka/pull/70)
 
 <a name="1.5.0"></a>
 ## [1.5.0] - 2020-07-22
@@ -376,7 +385,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.0...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.1...HEAD
+[1.5.1]: https://github.com/jet/FsKafka/compare/1.5.0...1.5.1
 [1.5.0]: https://github.com/jet/FsKafka/compare/1.4.5...1.5.0
 [1.4.5]: https://github.com/jet/FsKafka/compare/1.4.4...1.4.5
 [1.4.4]: https://github.com/jet/FsKafka/compare/1.4.4-rc3...1.4.4
