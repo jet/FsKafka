@@ -266,6 +266,8 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             ?statisticsInterval,
             /// Consumed offsets commit interval. Default 5s.
             ?autoCommitInterval,
+            /// Override default policy wrt auto-creating topics. Confluent.Kafka < 1.5 default: true; Confluent.Kafka >= 1.5 default: false
+            ?allowAutoCreateTopics,
             /// Misc configuration parameters to be passed to the underlying CK consumer. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string,string>,
             /// Misc configuration parameter to be passed to the underlying CK consumer.
@@ -298,6 +300,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
         fetchMinBytes |> Option.iter (fun x -> c.FetchMinBytes <- x) // Fetch waits for this amount of data for up to FetchWaitMaxMs (100)
         autoCommitInterval |> Option.iter<TimeSpan> (fun x -> c.AutoCommitIntervalMs <- Nullable <| int x.TotalMilliseconds)
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable <| int x.TotalMilliseconds)
+        allowAutoCreateTopics |> Option.iter (fun x -> c.AllowAutoCreateTopics <- Nullable x)
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter<ConsumerConfig -> unit> (fun f -> f c)
         {   inner = c

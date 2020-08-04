@@ -2,6 +2,10 @@
 
 The repo is versioned based on [SemVer 2.0](https://semver.org/spec/v2.0.0.html) using the tiny-but-mighty [MinVer](https://github.com/adamralph/minver) from [@adamralph](https://github.com/adamralph). [See here](https://github.com/adamralph/minver#how-it-works) for more information on how it works.
 
+Please note FsKafka has (generally additive) breaking changes even in Minor and Patch releases as:
+- FsKafka binds strongly to a specific version of `Confluent.Kafka` + `librdkafka.redist`,so arbitrary replacements are already frowned on
+- a primary goal is to be terse and not vary from the underlying defaults where possible - putting in lots of Obsoleted overloads as one normally should is contrary to this goal
+
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 The `Unreleased` section name is replaced by the expected version of next release. A stable version's log contains all changes between that version and the previous stable version (can duplicate the prereleases logs).
@@ -9,6 +13,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- BREAKING: `KafkaConsumerConfig.Create`: added `allowAutoCreateTopics` argument to enable control of `allow.auto.create.topics` now that `librdkafka 1.5` changes the default [#71](https://github.com/jet/FsKafka/pull/71)
+
 ### Changed
 
 - Changed unit of `maxInFlightBytes` when rendered in logs from GiB to MiB [#72](https://github.com/jet/FsKafka/pull/72)
@@ -28,11 +35,11 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Changed
 
-- Encapsulated linger/batching semantics in a `Batching` DU passed to `KafkaProducerConfig.Create` (instead of `linger` and `maxInFlight`) in lieu of having `BatchedProducer.CreateWithConfigOverrides` patch the values [#68](https://github.com/jet/FsKafka/pull/68)
+- BREAKING: Encapsulated linger/batching semantics in a `Batching` DU passed to `KafkaProducerConfig.Create` (instead of `linger` and `maxInFlight`) in lieu of having `BatchedProducer.CreateWithConfigOverrides` patch the values [#68](https://github.com/jet/FsKafka/pull/68)
 
 ### Fixed
 
-- Handle deadlock between `MaxInflightMessages` wait loop and Consumer cancellation [#61](https://github.com/jet/FsKafka/pull/61) :pray: Bilal Durrani
+- BREAKING: Handle deadlock between `MaxInflightMessages` wait loop and Consumer cancellation [#61](https://github.com/jet/FsKafka/pull/61) :pray: Bilal Durrani
 - `FsKafka0`: Aligned `Thread.Sleep` when over `maxInFlightBytes` threshold with `FsKafka` (reduced from `5` to `1` ms) [#67](https://github.com/jet/FsKafka/pull/67)
 
 <a name="1.4.4"></a>
