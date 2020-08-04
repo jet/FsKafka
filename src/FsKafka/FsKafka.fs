@@ -222,6 +222,8 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
         let inner = KafkaProducer.Create(log, config, topic)
         new BatchedProducer(inner.Inner, topic)
 
+#nowarn "44" // TODO remove when obsolete code removed
+
 module Core =
 
     [<NoComparison>]
@@ -230,7 +232,7 @@ module Core =
     module Constants =
         let messageCounterSourceContext = "FsKafka.Core.InFlightMessageCounter"
 
-    type InFlightMessageCounter(log: ILogger, minInFlightBytes : int64, maxInFlightBytes : int64) =
+    type InFlightMessageCounter(log : ILogger, minInFlightBytes : int64, maxInFlightBytes : int64) =
         do  if minInFlightBytes < 1L then invalidArg "minInFlightBytes" "must be positive value"
             if maxInFlightBytes < 1L then invalidArg "maxInFlightBytes" "must be positive value"
             if minInFlightBytes > maxInFlightBytes then invalidArg "maxInFlightBytes" "must be greater than minInFlightBytes"
@@ -240,13 +242,22 @@ module Core =
         member __.InFlightMb = float inFlightBytes / 1024. / 1024.
         member __.Delta(numBytes : int64) = Interlocked.Add(&inFlightBytes, numBytes) |> ignore
         member __.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
-        member __.AwaitThreshold(ct: CancellationToken, busyWork) =
+        [<Obsolete "Please use the overload with the consumer instead">]
+        member __.AwaitThreshold(ct : CancellationToken, busyWork) =
             if __.IsOverLimitNow() then
                 log.ForContext("maxB", maxInFlightBytes).Information("Consuming... breached in-flight message threshold (now ~{currentB:n0}B), quiescing until it drops to < ~{minMb:n1}MiB",
                     inFlightBytes, float minInFlightBytes / 1024. / 1024.)
                 while Volatile.Read(&inFlightBytes) > minInFlightBytes && not ct.IsCancellationRequested do
                     busyWork ()
-                log.Verbose "Consumer resuming polling"
+                log.Information "Consumer resuming polling"
+        member __.AwaitThreshold(ct : CancellationToken, consumer : IConsumer<_,_>) =
+            // Avoid having our assignments revoked due to MAXPOLL (exceeding max.poll.interval.ms between calls to .Consume)
+            let showConsumerWeAreStillAlive () =
+                let tps = consumer.Assignment
+                consumer.Pause(tps)
+                let _ = consumer.Consume(1)
+                consumer.Resume(tps)
+            __.AwaitThreshold(ct, showConsumerWeAreStillAlive)
 
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
@@ -485,7 +496,7 @@ module private ConsumerImpl =
         // run the consumer
         let ct = cts.Token
         try while not ct.IsCancellationRequested do
-                counter.AwaitThreshold(ct, fun () -> Thread.Sleep 1)
+                counter.AwaitThreshold(ct, consumer)
                 try let result = consumer.Consume(ct) // NB TimeSpan overload yields AVEs on 1.0.0-beta2
                     if result <> null then
                         counter.Delta(+approximateMessageBytes result)
