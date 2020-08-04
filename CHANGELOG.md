@@ -13,10 +13,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- Added overload of `InFlightMessageCounter.AwaitThreshold` with `busyWork` argument [#73](https://github.com/jet/FsKafka/pull/73)
+
 ### Changed
 ### Removed
 
-- Obsoleted deprecation overload of `KafkaProducerConfig.Create` introduced in 1.5.0
+- Removed deprecated overload of `KafkaProducerConfig.Create` introduced in 1.5.0 [#73](https://github.com/jet/FsKafka/pull/73)
+- Removed deprecated overload of `InFlightMessageCounter.AwaitThreshold` introduced in 1.5.1 [#73](https://github.com/jet/FsKafka/pull/73)
 
 ### Fixed
 
