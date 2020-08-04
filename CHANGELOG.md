@@ -10,6 +10,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+
+- Changed unit of `maxInFlightBytes` when rendered in logs from GiB to MiB [#72](https://github.com/jet/FsKafka/pull/72)
+
 ### Removed
 ### Fixed
 
