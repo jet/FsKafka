@@ -48,7 +48,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Fixed
 
-- BREAKING: Handle deadlock between `MaxInflightMessages` wait loop and Consumer cancellation [#61](https://github.com/jet/FsKafka/pull/61) :pray: Bilal Durrani
+- BREAKING: Handle deadlock between `maxInFlightMessageBytes` wait loop and Consumer cancellation [#61](https://github.com/jet/FsKafka/pull/61) :pray: [@bilaldurrani](https://github.com/bilaldurrani)
 - `FsKafka0`: Aligned `Thread.Sleep` when over `maxInFlightBytes` threshold with `FsKafka` (reduced from `5` to `1` ms) [#67](https://github.com/jet/FsKafka/pull/67)
 
 <a name="1.4.4"></a>
