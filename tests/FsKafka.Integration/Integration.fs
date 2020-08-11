@@ -200,55 +200,6 @@ type T2(testOutputHelper) =
         test <@ match r with Choice2Of2 (:? IndexOutOfRangeException) -> true | x -> failwithf "%A" x @>
     }
 
-#if !KAFKA0 // TODO if Kafka0 usage remains prevalent, figure out why this hangs ~25% of the time
-    let [<FactIfBroker>] ``BatchedConsumer should have expected quiescing semantics`` () = async {
-        let topic, groupId = newId(), newId() // dev kafka topics are created and truncated automatically
-
-        let producerCfg = KafkaProducerConfig.Create("panther", broker, Acks.Leader, Batching.Linger (TimeSpan.FromMilliseconds 10.))
-        use producer = KafkaProducer.Create(log, producerCfg, topic)
-        let value = String('v', 1024)
-        let keys = set [for x in 1..2 -> string x]
-        let! _ = Async.Parallel [for key in keys do producer.ProduceAsync(key, value) ]
-
-        let consumerCfg =
-            KafkaConsumerConfig.Create(
-                "panther", broker, [topic], groupId, AutoOffsetReset.Earliest,
-                maxInFlightBytes=1_000L,
-                customize=fun c ->
-#if KAFKA0
-                    ()
-#else
-                    // these properties are not implemented in FsKafka0
-                    c.MaxPollIntervalMs <- Nullable 10_000 // Default is 5m, needs to exceed SessionTimeoutMs
-                    c.SessionTimeoutMs <- Nullable 6_000 // Broker default min value is 6000
-#endif
-                )
-        let timer = System.Diagnostics.Stopwatch.StartNew()
-        let received = ConcurrentQueue()
-        let callCount = ref 0L
-        let handle messages = async {
-            for r in messages do
-                let m = Binding.message r
-                log.Information("Received {key} at {time}", m.Key, timer.ElapsedMilliseconds)
-                received.Enqueue((m.Key, timer.ElapsedMilliseconds))
-            match Interlocked.Increment callCount with
-            | 1L ->
-                // Drive the quiescing period over the MaxPollInterval
-                do! Async.Sleep 10_500
-            | _ when received.Count < keys.Count ->
-                ()
-            | _ ->
-                failwith "Completed"
-        }
-
-        use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
-        consumer.StopAfter (TimeSpan.FromSeconds 20.)
-        let! res = consumer.AwaitCompletion() |> Async.Catch
-        test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
-        test <@ set (Seq.map fst received) = keys @>
-    }
-#endif
-
     let [<FactIfBroker>] ``Given a topic different consumer group ids should be consuming the same message set`` () = async {
         let numMessages = 10
 
@@ -383,3 +334,87 @@ type T3(testOutputHelper) =
 
         test <@ numMessages = !globalMessageCount @>
     }
+
+// separated test type to allow the tests to run in parallel
+type T4(testOutputHelper) =
+    let log, broker = createLogger (TestOutputAdapter testOutputHelper), getTestBroker ()
+    let testValue = String('v', 1024)
+    let testKeys = set [for x in 1..2 -> string x]
+    
+    let produce topic = async {
+        let producerCfg = KafkaProducerConfig.Create("panther", broker, Acks.Leader, Batching.Linger (TimeSpan.FromMilliseconds 10.))
+        use producer = KafkaProducer.Create(log, producerCfg, topic)
+        return! Async.Parallel [for key in testKeys do producer.ProduceAsync(key, testValue) ]
+    }
+
+    let consumerCfg topic groupId=
+        KafkaConsumerConfig.Create(
+            "panther", broker, [topic], groupId, AutoOffsetReset.Earliest,
+            maxInFlightBytes=1_000L,
+            customize=fun c ->
+#if KAFKA0
+                ()
+#else
+                // these properties are not implemented in FsKafka0
+                c.MaxPollIntervalMs <- Nullable 10_000 // Default is 5m, needs to exceed SessionTimeoutMs
+                c.SessionTimeoutMs <- Nullable 6_000 // Broker default min value is 6000
+#endif
+        )
+            
+    let handle (timer : Diagnostics.Stopwatch) (received : ConcurrentQueue<string*int64>) (callCount : int64 ref) messages = async {
+        for r in messages do
+            let m = Binding.message r
+            log.Information("Received {key} at {time}", m.Key, timer.ElapsedMilliseconds)
+            received.Enqueue((m.Key, timer.ElapsedMilliseconds))
+        match Interlocked.Increment callCount with
+        | 1L ->
+            // Drive the quiescing period over the MaxPollInterval
+            do! Async.Sleep 10_500
+        | _ when received.Count < testKeys.Count ->
+            ()
+        | _ ->
+            failwith "Completed"
+    }
+    
+#if !KAFKA0 // TODO if Kafka0 usage remains prevalent, figure out why this hangs ~25% of the time
+    let [<FactIfBroker>] ``Without FsKafka.Monitor - BatchedConsumer should have expected quiescing semantics`` () = async {
+        let topic, groupId = newId(), newId() // dev kafka topics are created and truncated automatically
+        let! _ = produce topic
+        
+        let timer = System.Diagnostics.Stopwatch.StartNew()
+        let received = ConcurrentQueue()
+        let callCount = ref 0L
+        let consumerCfg = consumerCfg topic groupId
+        let handle = handle timer received callCount
+        
+        let! res = async {
+            use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
+            consumer.StopAfter (TimeSpan.FromSeconds 20.)
+            return! consumer.AwaitCompletion() |> Async.Catch    
+        }
+        
+        test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
+        test <@ set (Seq.map fst received) = testKeys @>
+    }
+
+    let [<FactIfBroker>] ``With FsKafka.Monitor - BatchedConsumer should have expected quiescing semantics`` () = async {
+        let topic, groupId = newId(), newId() // dev kafka topics are created and truncated automatically
+        let! _ = produce topic
+        
+        let timer = System.Diagnostics.Stopwatch.StartNew()
+        let received = ConcurrentQueue()
+        let callCount = ref 0L
+        let consumerCfg = consumerCfg topic groupId
+        let handle = handle timer received callCount
+        
+        let! res = async {
+            use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
+            consumer.StopAfter (TimeSpan.FromSeconds 20.)
+            do! FsKafka.KafkaMonitor(log).StartAsChild(consumer.Inner, consumerCfg.Inner.GroupId)
+            return! consumer.AwaitCompletion() |> Async.Catch    
+        }
+        
+        test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
+        test <@ set (Seq.map fst received) = testKeys @>
+    }
+#endif
