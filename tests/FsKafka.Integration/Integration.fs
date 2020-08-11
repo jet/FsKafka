@@ -200,7 +200,6 @@ type T2(testOutputHelper) =
         test <@ match r with Choice2Of2 (:? IndexOutOfRangeException) -> true | x -> failwithf "%A" x @>
     }
 
-#if !KAFKA0 // TODO if Kafka0 usage remains prevalent, figure out why this hangs ~25% of the time
     let [<FactIfBroker>] ``BatchedConsumer should have expected quiescing semantics`` () = async {
         let topic, groupId = newId(), newId() // dev kafka topics are created and truncated automatically
 
@@ -208,7 +207,8 @@ type T2(testOutputHelper) =
         use producer = KafkaProducer.Create(log, producerCfg, topic)
         let value = String('v', 1024)
         let keys = set [for x in 1..2 -> string x]
-        let! _ = Async.Parallel [for key in keys do producer.ProduceAsync(key, value) ]
+        for key in keys do
+            do! producer.ProduceAsync(key, value) |> Async.Ignore
 
         let consumerCfg =
             KafkaConsumerConfig.Create(
@@ -247,7 +247,6 @@ type T2(testOutputHelper) =
         test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
         test <@ set (Seq.map fst received) = keys @>
     }
-#endif
 
     let [<FactIfBroker>] ``Given a topic different consumer group ids should be consuming the same message set`` () = async {
         let numMessages = 10
