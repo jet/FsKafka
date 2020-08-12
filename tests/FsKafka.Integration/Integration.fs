@@ -410,7 +410,7 @@ type T4(testOutputHelper) =
         let! res = async {
             use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
             consumer.StopAfter (TimeSpan.FromSeconds 20.)
-            do! FsKafka.KafkaMonitor(log).StartAsChild(consumer.Inner, consumerCfg.Inner.GroupId)
+            use _ = FsKafka.KafkaMonitor(log).Start(consumer.Inner, consumerCfg.Inner.GroupId)
             return! consumer.AwaitCompletion() |> Async.Catch    
         }
         

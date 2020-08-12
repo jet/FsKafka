@@ -6,6 +6,7 @@ open Confluent.Kafka
 open Serilog
 open System
 open System.Diagnostics
+open System.Threading
 
 type PartitionResult =
     | OkReachedZero // check 1
@@ -346,18 +347,22 @@ type KafkaMonitor<'k,'v>
     [<CLIEvent>] member __.OnCheckFailed = onCheckFailed.Publish
 
     // One of these runs per topic
-    member private __.Pump(consumer, topic, group) =
+    member private __.Pump(consumer, topic, group) = async {
+        let! ct = Async.CancellationToken
         let onQuery res =
             MonitorImpl.Logging.logLatest log topic group res
         let onStatus topic group xs =
             MonitorImpl.Logging.logResults log topic group xs
             onStatus.Trigger(topic, xs)
         let onCheckFailed count exn =
-            MonitorImpl.Logging.logFailure log topic group count exn
-            onCheckFailed.Trigger(topic, count, exn)
-        MonitorImpl.run consumer (interval,windowSize,failResetCount) topic group (onQuery,onCheckFailed,onStatus)
-
-    /// Commences a child task per subscribed topic that will ob
-    member __.StartAsChild(target : IConsumer<'k,'v>, group) = async {
+            if not ct.IsCancellationRequested then
+                MonitorImpl.Logging.logFailure log topic group count exn
+                onCheckFailed.Trigger(topic, count, exn)
+        return! MonitorImpl.run consumer (interval,windowSize,failResetCount) topic group (onQuery,onCheckFailed,onStatus)
+    }
+    /// Commences a monitoring task per subscribed topic 
+    member __.Start(target : IConsumer<'k,'v>, group) = 
+        let cts = new CancellationTokenSource()
         for topic in target.Subscription do
-            Async.Start(__.Pump(target, topic, group)) }
+            Async.Start(__.Pump(target, topic, group), cts.Token)
+        { new IDisposable with member __.Dispose() = cts.Cancel() }
