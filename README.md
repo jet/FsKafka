@@ -141,7 +141,7 @@ let cfg = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["MyTopic"], "M
 
 async {
     use consumer = BatchedConsumer.Start(log, cfg, handler)
-    do! KafkaMonitor(log).StartAsChild(consumer.Inner, cfg.Inner.GroupId)
+    use _ = KafkaMonitor(log).Start(consumer.Inner, cfg.Inner.GroupId)
     return! consumer.AwaitCompletion()
 } |> Async.RunSynchronously
 ```
