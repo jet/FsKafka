@@ -14,13 +14,21 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
-
-- BREAKING: The name of the start function in FsKafka.KafkaMonitor `StartAsChild` was changed to `Start`, changed the return type from to `IDisposable`
-
 ### Removed
 ### Fixed
 
 - Provided the mechanism to tear down the monitoring loop when the consumer stops
+
+<a name="1.5.2"></a>
+## [1.5.] - 2020-08-19
+
+### Changed
+
+- BREAKING: The name of the start function in FsKafka.KafkaMonitor `StartAsChild` was changed to `Start`, changed the return type from to `IDisposable` [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84) 
+
+### Fixed
+
+- Provided the mechanism to tear down the monitoring loop when the consumer stops [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84) 
 
 <a name="1.5.1"></a>
 ## [1.5.1] - 2020-08-04
@@ -390,7 +398,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.1...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.2...HEAD
+[1.5.2]: https://github.com/jet/FsKafka/compare/1.5.1...1.5.2
 [1.5.1]: https://github.com/jet/FsKafka/compare/1.5.0...1.5.1
 [1.5.0]: https://github.com/jet/FsKafka/compare/1.4.5...1.5.0
 [1.4.5]: https://github.com/jet/FsKafka/compare/1.4.4...1.4.5
