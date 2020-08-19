@@ -14,8 +14,13 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+
+- BREAKING: The name of the start function in FsKafka.KafkaMonitor `StartAsChild` was changed to `Start`, changed the return type from to `IDisposable`
+
 ### Removed
 ### Fixed
+
+- Provided the mechanism to tear down the monitoring loop when the consumer stops
 
 <a name="1.5.1"></a>
 ## [1.5.1] - 2020-08-04
