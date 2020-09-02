@@ -17,18 +17,16 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
-- Provided the mechanism to tear down the monitoring loop when the consumer stops
-
 <a name="1.5.2"></a>
-## [1.5.] - 2020-08-19
+## [1.5.2] - 2020-08-19
 
 ### Changed
 
-- BREAKING: The name of the start function in FsKafka.KafkaMonitor `StartAsChild` was changed to `Start`, changed the return type from to `IDisposable` [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84) 
+- BREAKING: Renamed `FsKafka.KafkaMonitor.StartAsChild` to `Start`, changed return type to `IDisposable` [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84) 
 
 ### Fixed
 
-- Provided the mechanism to tear down the monitoring loop when the consumer stops [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84) 
+- Provided mechanism to tear down the monitoring loop when the consumer stops [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84) 
 
 <a name="1.5.1"></a>
 ## [1.5.1] - 2020-08-04
