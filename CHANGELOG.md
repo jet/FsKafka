@@ -13,6 +13,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- Added a logging for exception caught in the batch processing loop. Any uncaught exception from the handler will be logged here as well.  
+
 ### Changed
 ### Removed
 ### Fixed
