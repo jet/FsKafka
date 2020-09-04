@@ -485,6 +485,7 @@ module private ConsumerImpl =
                             let batchSize = batch |> Array.sumBy approximateMessageBytes
                             counter.Delta(-batchSize)
                     with e ->
+                        log.Information("Exception occurred while processing a batch: {message}", e.Message)
                         tcs.TrySetException e |> ignore
                         cts.Cancel()
                     return! loop() }
