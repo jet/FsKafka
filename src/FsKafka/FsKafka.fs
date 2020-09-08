@@ -462,18 +462,22 @@ module private ConsumerImpl =
             let buffer = Array.zeroCreate buf.maxBatchSize
             let nextBatch () =
                 let count = collection.FillBuffer(buffer, buf.maxBatchDelay)
-                if count <> 0 then log.Debug("Consuming {count}", count)
                 let batch = Array.init count (fun i -> buffer.[i])
                 Array.Clear(buffer, 0, count)
                 batch
 
             let rec loop () = async {
                 if not collection.IsCompleted then
+                    let batchWatch = System.Diagnostics.Stopwatch()
+                    let mutable batchLen, batchSize = 0, 0L
+                    use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
                     try match nextBatch() with
                         | [||] -> ()
                         | batch ->
-                            use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
-                            log.Debug("Dispatching {count} message(s) to handler", batch.Length)
+                            batchLen <- batch.Length
+                            batchSize <- batch |> Array.sumBy approximateMessageBytes
+                            batchWatch.Start()
+                            log.ForContext("batchSize", batchSize).Debug("Dispatching {batchLen} message(s) to handler", batchLen)
                             // run the handler function
                             do! handler batch
 
@@ -482,9 +486,10 @@ module private ConsumerImpl =
                             consumer.StoreOffset(lastItem)
 
                             // decrement in-flight message counter
-                            let batchSize = batch |> Array.sumBy approximateMessageBytes
                             counter.Delta(-batchSize)
                     with e ->
+                        log.ForContext("batchSize", batchSize).ForContext("batchLen", batchLen).ForContext("handlerDuration", batchWatch.Elapsed)
+                            .Information(e, "Exiting batch processing loop due to handler exception") 
                         tcs.TrySetException e |> ignore
                         cts.Cancel()
                     return! loop() }
