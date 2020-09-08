@@ -13,12 +13,16 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
-
-- Added a logging for exception caught in the batch processing loop. Any uncaught exception from the handler will be logged here as well.  
-
 ### Changed
 ### Removed
 ### Fixed
+
+<a name="1.5.3"></a>
+## [1.5.3] - 2020-09-08
+
+### Added
+
+- Logging of consume-loop terminating exceptions caught in the batch processing loop and/or handler [#78](https://github.com/jet/FsKafka/pull/78) :pray: [@wantastic84](https://github.com/wantastic84) 
 
 <a name="1.5.2"></a>
 ## [1.5.2] - 2020-08-19
@@ -399,7 +403,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.2...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.3...HEAD
+[1.5.3]: https://github.com/jet/FsKafka/compare/1.5.2...1.5.3
 [1.5.2]: https://github.com/jet/FsKafka/compare/1.5.1...1.5.2
 [1.5.1]: https://github.com/jet/FsKafka/compare/1.5.0...1.5.1
 [1.5.0]: https://github.com/jet/FsKafka/compare/1.4.5...1.5.0
