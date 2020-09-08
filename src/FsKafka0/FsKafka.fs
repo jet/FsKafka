@@ -480,10 +480,14 @@ module private ConsumerImpl =
 
             let rec loop () = async {
                 if not collection.IsCompleted then
+                    let batchWatch = System.Diagnostics.Stopwatch()
+                    let mutable batchLen = 0
+                    use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
                     try match nextBatch() with
                         | [||] -> ()
                         | batch ->
-                            use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
+                            batchLen <- batch.Length
+                            batchWatch.Start()
                             log.Debug("Dispatching {count} message(s) to handler", batch.Length)
                             // run the handler function
                             do! handler batch
@@ -495,6 +499,8 @@ module private ConsumerImpl =
                             let batchSize = batch |> Array.sumBy (fun m -> getMessageSize m)
                             counter.Delta -batchSize
                     with e ->
+                        log.ForContext("batchSize", batchLen).ForContext("handlerDuration", batchWatch.Elapsed)
+                            .Information(e, "Exiting batch processing loop due to handler exception")
                         tcs.TrySetException e |> ignore
                         cts.Cancel()
                     return! loop() }
