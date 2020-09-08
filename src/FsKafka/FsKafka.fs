@@ -476,6 +476,7 @@ module private ConsumerImpl =
                         | batch ->
                             batchLen <- batch.Length
                             batchWatch.Start()
+                            log.Debug("Dispatching {count} message(s) to handler", batchLen)
                             // run the handler function
                             do! handler batch
 
