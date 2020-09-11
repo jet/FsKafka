@@ -17,6 +17,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+- Memory leak in the tail recursion: disposables within the tail recursion loop do not get disposed until the recursion terminates. Fixed it by replacing the tail recursion with while loop.
+
 <a name="1.5.3"></a>
 ## [1.5.3] - 2020-09-08
 

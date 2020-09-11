@@ -466,35 +466,37 @@ module private ConsumerImpl =
                 Array.Clear(buffer, 0, count)
                 batch
 
-            let rec loop () = async {
-                if not collection.IsCompleted then
-                    let batchWatch = System.Diagnostics.Stopwatch()
-                    let mutable batchLen, batchSize = 0, 0L
-                    use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
-                    try match nextBatch() with
-                        | [||] -> ()
-                        | batch ->
-                            batchLen <- batch.Length
-                            batchSize <- batch |> Array.sumBy approximateMessageBytes
-                            batchWatch.Start()
-                            log.ForContext("batchSize", batchSize).Debug("Dispatching {batchLen} message(s) to handler", batchLen)
-                            // run the handler function
-                            do! handler batch
+            let processBatch = async {
+                let batchWatch = System.Diagnostics.Stopwatch()
+                let mutable batchLen, batchSize = 0, 0L
+                try match nextBatch() with
+                    | [||] -> ()
+                    | batch ->
+                        batchLen <- batch.Length
+                        batchSize <- batch |> Array.sumBy approximateMessageBytes
+                        batchWatch.Start()
+                        log.ForContext("batchSize", batchSize).Debug("Dispatching {batchLen} message(s) to handler", batchLen)
+                        // run the handler function
+                        do! handler batch
 
-                            // store completed offsets
-                            let lastItem = batch |> Array.maxBy (fun m -> Binding.offsetValue m.Offset)
-                            consumer.StoreOffset(lastItem)
+                        // store completed offsets
+                        let lastItem = batch |> Array.maxBy (fun m -> Binding.offsetValue m.Offset)
+                        consumer.StoreOffset(lastItem)
 
-                            // decrement in-flight message counter
-                            counter.Delta(-batchSize)
-                    with e ->
-                        log.ForContext("batchSize", batchSize).ForContext("batchLen", batchLen).ForContext("handlerDuration", batchWatch.Elapsed)
-                            .Information(e, "Exiting batch processing loop due to handler exception") 
-                        tcs.TrySetException e |> ignore
-                        cts.Cancel()
-                    return! loop() }
+                        // decrement in-flight message counter
+                        counter.Delta(-batchSize)
+                with e ->
+                    log.ForContext("batchSize", batchSize).ForContext("batchLen", batchLen).ForContext("handlerDuration", batchWatch.Elapsed)
+                        .Information(e, "Exiting batch processing loop due to handler exception") 
+                    tcs.TrySetException e |> ignore
+                    cts.Cancel() }
+            
+            let loop = async {
+                use __ = Serilog.Context.LogContext.PushProperty("partition", Binding.partitionValue key.Partition)
+                while not collection.IsCompleted do
+                    do! processBatch }
 
-            Async.Start(loop(), cts.Token)
+            Async.Start(loop, cts.Token)
 
         use _ = partitionedCollection.OnPartitionAdded.Subscribe consumePartition
 
