@@ -17,7 +17,12 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
-- Memory leak in the tail recursion: disposables within the tail recursion loop do not get disposed until the recursion terminates. Fixed it by replacing the tail recursion with while loop.
+<a name="1.5.4"></a>
+## [1.5.4] - 2020-09-11
+
+### Fixed
+
+- Resolved Memory leak introduced in 1.5.3 [#79](https://github.com/jet/FsKafka/pull/79) :pray: [@wantastic84](https://github.com/wantastic84) 
 
 <a name="1.5.3"></a>
 ## [1.5.3] - 2020-09-08
@@ -405,7 +410,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.3...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.4...HEAD
+[1.5.4]: https://github.com/jet/FsKafka/compare/1.5.3...1.5.4
 [1.5.3]: https://github.com/jet/FsKafka/compare/1.5.2...1.5.3
 [1.5.2]: https://github.com/jet/FsKafka/compare/1.5.1...1.5.2
 [1.5.1]: https://github.com/jet/FsKafka/compare/1.5.0...1.5.1
