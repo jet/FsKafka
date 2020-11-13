@@ -45,9 +45,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
 
     /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
     static member Create
-        (   clientId : string, bootstrapServers : string,
-            /// Default: All
-            acks,
+        (   clientId : string, bootstrapServers : string, acks,
             /// Defines combination of linger/maxInFlight settings to effect desired batching semantics
             batching : Batching,
             /// Message compression. Default: None.
@@ -97,9 +95,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
     [<Obsolete "linger is now mandatory as a result of Confluent.Kafka 1.5's changing the default from 0.5ms to 5ms">]
     // TODO remove in 2.0.0
     static member Create
-        (   clientId : string, bootstrapServers : string,
-            /// Default: All
-            acks,
+        (   clientId : string, bootstrapServers : string, acks,
             /// Message compression. Default: None.
             ?compression,
             /// Maximum in-flight requests. Default: 1_000_000.
@@ -114,7 +110,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
             ?retryBackoff,
             /// Statistics Interval. Default: no stats.
             ?statisticsInterval,
-            /// Ack timeout (assuming Acks != Acks.0). Confluent.Kafka default: 5s.
+            /// Ack timeout (assuming Acks != Acks.Zero). Confluent.Kafka default: 5s.
             ?requestTimeout,
             /// Confluent.Kafka default: false. Defaults to true.
             ?socketKeepAlive,
