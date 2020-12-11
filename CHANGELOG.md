@@ -14,11 +14,15 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
-
-- Target [`Confluent.Kafka [1.5.3]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/v1.5.3/CHANGELOG.md#153), [`librdkafka.redist [1.5.3]`](https://github.com/edenhill/librdkafka/releases/tag/v1.5.3) [#82](https://github.com/jet/FsKafka/pull/82)
-
 ### Removed
 ### Fixed
+
+<a name="1.5.6"></a>
+## [1.5.6] - 2020-12-11
+
+### Changed
+
+- Target [`Confluent.Kafka [1.5.3]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/v1.5.3/CHANGELOG.md#153), [`librdkafka.redist [1.5.3]`](https://github.com/edenhill/librdkafka/releases/tag/v1.5.3) [#82](https://github.com/jet/FsKafka/pull/82)
 
 <a name="1.5.5"></a>
 ## [1.5.5] - 2020-10-21
@@ -420,7 +424,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.5...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.6...HEAD
+[1.5.6]: https://github.com/jet/FsKafka/compare/1.5.5...1.5.6
 [1.5.5]: https://github.com/jet/FsKafka/compare/1.5.4...1.5.5
 [1.5.4]: https://github.com/jet/FsKafka/compare/1.5.3...1.5.4
 [1.5.3]: https://github.com/jet/FsKafka/compare/1.5.2...1.5.3
