@@ -145,3 +145,30 @@ async {
     return! consumer.AwaitShutdown()
 } |> Async.RunSynchronously
 ```
+
+## Running (and awaiting) a pair of consumers until either abends
+
+```fsharp
+#r "nuget:FsKafka"
+open Confluent.Kafka
+open FsKafka
+
+let log = Serilog.LoggerConfiguration().CreateLogger()
+
+let handler (messages : ConsumeResult<string,string> []) = async {
+    for m in messages do
+        printfn "Received: %s" m.Message.Value
+} 
+
+let config topic = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", [topic], "MyGroupId", AutoOffsetReset.Earliest)
+
+let cfg1, cfg2 = config "MyTopicA", config "MyTopicB"
+
+async {
+    use consumer1 = BatchedConsumer.Start(log, cfg1, handler)
+    use consumer2 = BatchedConsumer.Start(log, cfg2, handler)
+    use _ = KafkaMonitor(log).Start(consumer1.Inner, cfg1.Inner.GroupId)
+    use _ = KafkaMonitor(log).Start(consumer2.Inner, cfg2.Inner.GroupId)
+    return! Async.Parallel [consumer1.AwaitWithStopOnCancellation(); consumer2.AwaitWithStopOnCancellation()]
+} |> Async.RunSynchronously
+```
