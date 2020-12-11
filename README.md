@@ -119,7 +119,7 @@ let cfg = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["MyTopic"], "M
 
 async {
     use consumer = BatchedConsumer.Start(log, cfg, handler)
-    return! consumer.AwaitCompletion()
+    return! consumer.AwaitShutdown()
 } |> Async.RunSynchronously
 ```
 
@@ -142,6 +142,6 @@ let cfg = KafkaConsumerConfig.Create("MyClientId", "kafka:9092", ["MyTopic"], "M
 async {
     use consumer = BatchedConsumer.Start(log, cfg, handler)
     use _ = KafkaMonitor(log).Start(consumer.Inner, cfg.Inner.GroupId)
-    return! consumer.AwaitCompletion()
+    return! consumer.AwaitShutdown()
 } |> Async.RunSynchronously
 ```

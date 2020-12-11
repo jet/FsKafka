@@ -479,7 +479,7 @@ module private ConsumerImpl =
 
 /// Creates and wraps a Confluent.Kafka IConsumer, wrapping it to afford a batched consumption mode with implicit offset progression at the end of each
 /// (parallel across partitions, sequenced/monotonic within) batch of processing carried out by the `partitionHandler`
-/// Conclusion of the processing (when a `partitionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitCompletion()`
+/// Conclusion of the processing (when a `partitionHandler` throws and/or `Stop()` is called) can be awaited via `AwaitShutdown()`
 type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
     member __.Inner = inner
 
@@ -490,7 +490,9 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
     member __.Status = task.Status
     member __.RanToCompletion = task.Status = TaskStatus.RanToCompletion
     /// Asynchronously awaits until consumer stops or is faulted
-    member __.AwaitCompletion() = Async.AwaitTaskCorrect task
+    member __.AwaitShutdown() =
+        // NOTE NOT Async.AwaitTask task, or we hang in the case of termination via `Stop()`
+        Async.AwaitTaskCorrect task
 
     /// Starts a Kafka consumer with the provided configuration. Batches are grouped by topic partition.
     /// Batches belonging to the same topic partition will be scheduled sequentially and monotonically; however batches from different partitions can run concurrently.
