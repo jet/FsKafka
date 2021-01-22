@@ -15,8 +15,12 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 
 - Added overload of `InFlightMessageCounter.AwaitThreshold` with `busyWork` argument [#73](https://github.com/jet/FsKafka/pull/73)
+- `BatchedConsumer`: Added `AwaitWithStopOnCancellation` [#83](https://github.com/jet/FsKafka/pull/83)
 
 ### Changed
+
+- `BatchedConsumer`: Renamed `AwaitCompletion` to `AwaitShutdown` [#83](https://github.com/jet/FsKafka/pull/83)
+
 ### Removed
 
 - Removed deprecated overload of `KafkaProducerConfig.Create` introduced in 1.5.0 [#73](https://github.com/jet/FsKafka/pull/73)
