@@ -65,9 +65,9 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
             /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string,string>,
             /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
-            ?custom,
+            ?custom : #seq<KeyValuePair<string, string>>,
             /// Postprocesses the ProducerConfig after the rest of the rules have been applied
-            ?customize) =
+            ?customize : ProducerConfig -> unit) =
         let linger, maxInFlight =
             match batching with
             | Linger l -> l, None

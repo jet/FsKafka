@@ -62,12 +62,14 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
             ?socketKeepAlive,
             /// Partition algorithm. Default: `ConsistentRandom`.
             ?partitioner,
+            /// Confluent.Kafka default: 1mB
+            ?messageMaxBytes,
             /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
-            ?config : IDictionary<string,string>,
+            ?config : IDictionary<string, string>,
             /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
-            ?custom,
+            ?custom : #seq<KeyValuePair<string, string>>,
             /// Postprocesses the ProducerConfig after the rest of the rules have been applied
-            ?customize) =
+            ?customize : ProducerConfig -> unit) =
         let linger, maxInFlight =
             match batching with
             | Linger l -> l, None
@@ -88,6 +90,7 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         compression |> Option.iter (fun x -> c.CompressionType <- Nullable x)
         requestTimeout |> Option.iter<TimeSpan> (fun x -> c.RequestTimeoutMs <- Nullable (int x.TotalMilliseconds))
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable (int x.TotalMilliseconds))
+        messageMaxBytes |> Option.iter (fun x -> c.MessageMaxBytes <- Nullable x)
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
         customize |> Option.iter (fun f -> f c)
         KafkaProducerConfig(c, bootstrapServers)
