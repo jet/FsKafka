@@ -113,7 +113,7 @@ module Helpers =
 
             timeout |> Option.iter consumer.StopAfter
 
-            return! consumer.AwaitCompletion()
+            return! consumer.AwaitShutdown()
         }
 
         return! Async.Parallel [for i in 1 .. numConsumers -> mkConsumer i] |> Async.Ignore
@@ -390,7 +390,7 @@ type T4(testOutputHelper) =
         let! res = async {
             use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
             consumer.StopAfter (TimeSpan.FromSeconds 20.)
-            return! consumer.AwaitCompletion() |> Async.Catch    
+            return! consumer.AwaitShutdown() |> Async.Catch
         }
         
         test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
@@ -411,7 +411,7 @@ type T4(testOutputHelper) =
             use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
             consumer.StopAfter (TimeSpan.FromSeconds 20.)
             use _ = FsKafka.KafkaMonitor(log).Start(consumer.Inner, consumerCfg.Inner.GroupId)
-            return! consumer.AwaitCompletion() |> Async.Catch    
+            return! consumer.AwaitShutdown() |> Async.Catch
         }
         
         test <@ match res with Choice2Of2 e when e.Message = "Completed" -> true | _ -> false @>
