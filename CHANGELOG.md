@@ -20,6 +20,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Changed
 
+- Target [`Confluent.Kafka [1.6.2]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/v1.6.2/CHANGELOG.md#162), [`librdkafka.redist [1.6.1]`](https://github.com/edenhill/librdkafka/releases/tag/v1.6.1) [#85](https://github.com/jet/FsKafka/pull/85)
 - `BatchedConsumer`: Renamed `AwaitCompletion` to `AwaitShutdown` [#83](https://github.com/jet/FsKafka/pull/83)
 
 ### Removed
