@@ -13,6 +13,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+### Changed
+### Removed
+### Fixed
+
+<a name="1.6.2"></a>
+## [1.6.2] - 2021-02-26
+
+### Added
 
 - Added overload of `InFlightMessageCounter.AwaitThreshold` with `busyWork` argument [#73](https://github.com/jet/FsKafka/pull/73)
 - `BatchedConsumer`: Added `AwaitWithStopOnCancellation` [#83](https://github.com/jet/FsKafka/pull/83)
@@ -27,8 +35,6 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 - Removed deprecated overload of `KafkaProducerConfig.Create` introduced in 1.5.0 [#73](https://github.com/jet/FsKafka/pull/73)
 - Removed deprecated overload of `InFlightMessageCounter.AwaitThreshold` introduced in 1.5.1 [#73](https://github.com/jet/FsKafka/pull/73)
-
-### Fixed
 
 <a name="1.5.6"></a>
 ## [1.5.6] - 2020-12-11
@@ -437,7 +443,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.5.6...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.6.2...HEAD
+[1.6.2]: https://github.com/jet/FsKafka/compare/1.5.6...1.6.2
 [1.5.6]: https://github.com/jet/FsKafka/compare/1.5.5...1.5.6
 [1.5.5]: https://github.com/jet/FsKafka/compare/1.5.4...1.5.5
 [1.5.4]: https://github.com/jet/FsKafka/compare/1.5.3...1.5.4
