@@ -65,9 +65,9 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
             /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string,string>,
             /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
-            ?custom,
+            ?custom : #seq<KeyValuePair<string, string>>,
             /// Postprocesses the ProducerConfig after the rest of the rules have been applied
-            ?customize) =
+            ?customize : ProducerConfig -> unit) =
         let linger, maxInFlight =
             match batching with
             | Linger l -> l, None
@@ -231,9 +231,9 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
             /// Misc configuration parameters to be passed to the underlying CK consumer. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string,string>,
             /// Misc configuration parameter to be passed to the underlying CK consumer.
-            ?custom,
+            ?custom : #seq<KeyValuePair<string, string>>,
             /// Postprocesses the ConsumerConfig after the rest of the rules have been applied
-            ?customize,
+            ?customize : ConsumerConfig -> unit,
 
             (* Client-side batching / limiting of reading ahead to constrain memory consumption *)
 
@@ -262,7 +262,7 @@ type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list;
         statisticsInterval |> Option.iter<TimeSpan> (fun x -> c.StatisticsIntervalMs <- Nullable <| int x.TotalMilliseconds)
         allowAutoCreateTopics |> Option.iter (fun x -> c.AllowAutoCreateTopics <- Nullable x)
         custom |> Option.iter (fun xs -> for KeyValue (k,v) in xs do c.Set(k,v))
-        customize |> Option.iter<ConsumerConfig -> unit> (fun f -> f c)
+        customize |> Option.iter (fun f -> f c)
         {   inner = c
             topics = match Seq.toList topics with [] -> invalidArg "topics" "must be non-empty collection" | ts -> ts
             buffering = {

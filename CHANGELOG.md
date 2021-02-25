@@ -16,6 +16,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 - Added overload of `InFlightMessageCounter.AwaitThreshold` with `busyWork` argument [#73](https://github.com/jet/FsKafka/pull/73)
 - `BatchedConsumer`: Added `AwaitWithStopOnCancellation` [#83](https://github.com/jet/FsKafka/pull/83)
+- `ProducerConfig`: Add `maxMessageBytes` parameter to constructor [#84](https://github.com/jet/FsKafka/pull/84)
 
 ### Changed
 
