@@ -67,21 +67,43 @@ module Helpers =
             Task.Delay(delay).ContinueWith(fun (_:Task) -> c.Stop()) |> ignore
 
     type TestMessage = { producerId : int ; messageId : int }
+
+    type MessageHeaders = seq<string * byte[]>
+
     [<NoComparison; NoEquality>]
-    type ConsumedTestMessage = { consumerId : int ; result : ConsumeResult<string,string> ; payload : TestMessage }
+    type ConsumedTestMessage = { 
+        consumerId : int 
+        result : ConsumeResult<string,string>
+        payload : TestMessage
+        headers: MessageHeaders
+    }
+
     type ConsumerCallback = BatchedConsumer -> ConsumedTestMessage [] -> Async<unit>
+
+    let headers = 
+    #if !KAFKA0 
+        seq ["kafka", [| 0xDEuy; 0xADuy; 0xBEuy; 0xEFuy |]]
+    #else
+        seq []
+    #endif
 
     let runProducers log broker (topic : string) (numProducers : int) (messagesPerProducer : int) = async {
         let runProducer (producerId : int) = async {
             let cfg = KafkaProducerConfig.Create("panther", broker, Acks.Leader, Batching.Custom (TimeSpan.FromMilliseconds 100., 10_000))
             use producer = BatchedProducer.Create(log, cfg, topic)
 
+
             let! results =
                 [1 .. messagesPerProducer]
                 |> Seq.map (fun msgId ->
                     let key = string msgId
                     let value = JsonConvert.SerializeObject { producerId = producerId ; messageId = msgId }
-                    key, value)
+                #if KAFKA0
+                    key, value
+                #else
+                    key, value, headers
+                #endif                    
+                )
                 |> Seq.chunkBySize 100
                 |> Seq.map producer.ProduceBatch
                 |> Async.ParallelThrottled 7
@@ -96,7 +118,21 @@ module Helpers =
         let mkConsumer (consumerId : int) = async {
             let deserialize result =
                 let message = Binding.message result
-                { consumerId = consumerId ; result = result ; payload = JsonConvert.DeserializeObject<_> message.Value }
+                let headers = 
+                #if !KAFKA0 
+                    match message.Headers with 
+                    | null -> Seq.empty 
+                    | h -> h |> Seq.map(fun h -> h.Key, h.GetValueBytes())
+                #else
+                    Seq.empty
+                #endif
+
+                { 
+                    consumerId = consumerId 
+                    result = result 
+                    payload = JsonConvert.DeserializeObject<_> message.Value 
+                    headers = headers
+                }
 
             // need to pass the consumer instance to the handler callback; perform some cyclic dependency fixups
             let consumerCell = ref None
@@ -156,6 +192,15 @@ type T1(testOutputHelper) =
             |> Seq.forall (not << Array.isEmpty)
 
         test <@ ``consumed batches should be non-empty`` @> // "consumed batches should all be non-empty")
+
+        // Section: assertion checks
+        let ``consumed batches should have received the same headers back`` =
+            consumedBatches
+            |> Seq.concat
+            |> Seq.forall (fun m -> Seq.forall2 (=) m.headers headers)
+
+        test <@ ``consumed batches should be non-empty`` @> // "consumed batches should all be non-empty")
+
 
         let ``batches should be grouped by partition`` =
             consumedBatches
