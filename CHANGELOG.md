@@ -14,17 +14,16 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 
-- Added overload of `BatchedProducer` to support message headers
-- Added overload of `BatchedProducer` to support passing in `Message[]`
+- Added overload of `BatchedProducer` to support message headers [#86](https://github.com/jet/FsKafka/pull/86)
+- Added overload of `BatchedProducer` to support passing in `Message[]` [#86](https://github.com/jet/FsKafka/pull/86)
 
 ### Changed
 ### Removed
 ### Fixed
 
-- xmldocs for `BatchedProducer`
+- xmldocs for `BatchedProducer` [#86](https://github.com/jet/FsKafka/pull/86)
 
 <a name="1.6.2"></a>
-
 ## [1.6.2] - 2021-02-26
 
 ### Added

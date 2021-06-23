@@ -172,14 +172,11 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.
     /// </remarks>
     member __.ProduceBatch(messageBatch : Message<_, _>[]) : Async<DeliveryReport<string,string>[]> = async {
-        match Array.ofSeq messageBatch with
-        | [||] -> return [||] 
-        | batch ->
 
         let! ct = Async.CancellationToken
 
         let tcs = TaskCompletionSource<DeliveryReport<_,_>[]>()
-        let numMessages = batch.Length
+        let numMessages = messageBatch.Length
         let results = Array.zeroCreate<DeliveryReport<_,_>> numMessages
         let numCompleted = ref 0
 
@@ -194,7 +191,7 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
                 results.[i - 1] <- m
                 if i = numMessages then tcs.TrySetResult results |> ignore 
 
-        for message in batch do
+        for message in messageBatch do
             inner.Produce(topic, message, deliveryHandler=handler)
 
         inner.Flush(ct)
