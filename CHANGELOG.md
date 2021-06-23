@@ -13,9 +13,15 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
+
+- Added overload of `BatchedProducer` to support message headers [#86](https://github.com/jet/FsKafka/pull/86)
+- Added overload of `BatchedProducer` to support passing in `Message[]` [#86](https://github.com/jet/FsKafka/pull/86)
+
 ### Changed
 ### Removed
 ### Fixed
+
+- xmldocs for `BatchedProducer` [#86](https://github.com/jet/FsKafka/pull/86)
 
 <a name="1.6.2"></a>
 ## [1.6.2] - 2021-02-26
@@ -138,7 +144,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Added
 
 - include `partition` property as `LogContext.PushProperty` when dispatching a handler invocation [#60](https://github.com/jet/FsKafka/pull/60)
-  
+
 ### Changed
 
 - Target `Confluent.Kafka [1.4.4-RC1]`, `librdkafka.redist [1.4.4]`

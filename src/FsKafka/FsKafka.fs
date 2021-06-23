@@ -95,34 +95,52 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         customize |> Option.iter (fun f -> f c)
         KafkaProducerConfig(c, bootstrapServers)
 
+module private Message =
+    
+    let create(key: string, value: string) =
+        Message<_,_>(Key=key, Value=value)
+
+    let createWithHeaders(key: string, value: string, headers : seq<string * byte[]>) =
+        let message = Message<_,_>(Key=key, Value=value, Headers = Headers())
+        for header in headers do
+            message.Headers.Add(Header header)
+        message
+    
 /// Creates and wraps a Confluent.Kafka Producer with the supplied configuration
 type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     member __.Inner = inner
     member __.Topic = topic
 
-    interface IDisposable with member __.Dispose() = inner.Dispose()
+    interface IDisposable with member _.Dispose() = inner.Dispose()
 
-    /// Produces a single item, yielding a response upon completion/failure of the ack
+    /// <summary> Produces a single message, yielding a response upon completion/failure of the ack (>3ms to complete)</summary>
     /// <remarks>
-    ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
-    ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
+    /// There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
+    /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
+    /// response from the call.
+    /// </remarks>
     member __.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<string, string>> = async {
         let! ct = Async.CancellationToken
         return! inner.ProduceAsync(topic, message, ct) |> Async.AwaitTaskCorrect }
 
-    /// Produces a single item, yielding a response upon completion/failure of the ack
+    /// <summary> Produces a single message, yielding a response upon completion/failure of the ack (>3ms to complete)</summary>
     /// <remarks>
-    ///     There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
-    ///     Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure response from the call.<remarks/>
-    member __.ProduceAsync(key, value, ?headers : #seq<string*byte[]>) : Async<DeliveryResult<string, string>> =
-        let message = Message<_,_>(Key=key, Value=value)
-        match headers with
-        | None -> ()
-        | Some hs ->
-            let messageHeaders = Headers()
-            for k, v in hs do messageHeaders.Add(k, v)
-            message.Headers <- messageHeaders
+    /// There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
+    /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
+    /// response from the call.
+    /// </remarks>
+    member __.ProduceAsync(key : string, value: string, headers : seq<string * byte[]>) : Async<DeliveryResult<string, string>> =
+        let message = Message.createWithHeaders(key, value, headers)
         __.ProduceAsync(message)
+
+    /// <summary> Produces a single message, yielding a response upon completion/failure of the ack (>3ms to complete)</summary>
+    /// <remarks>
+    /// There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
+    /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
+    /// response from the call.
+    /// </remarks>
+    member __.ProduceAsync(key : string, value : string) : Async<DeliveryResult<string, string>> =
+        __.ProduceAsync(Message.create (key, value))
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string): KafkaProducer =
         if String.IsNullOrEmpty topic then nullArg "topic"
@@ -141,20 +159,23 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
 
     interface IDisposable with member __.Dispose() = inner.Dispose()
 
+    /// <summary>
     /// Produces a batch of supplied key/value messages. Results are returned in order of writing (which may vary from order of submission).
+    /// </summary>
     /// <throws>
     ///    1. if there is an immediate local config issue
     ///    2. upon receipt of the first failed `DeliveryReport` (NB without waiting for any further reports, which can potentially leave some results in doubt should a 'batch' get split) </throws>
     /// <remarks>
     ///    Note that the delivery and/or write order may vary from the supplied order unless `maxInFlight` is 1 (which massively constrains throughput).
-    ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.<remarks/>
-    member __.ProduceBatch(keyValueBatch : (string * string)[]) : Async<DeliveryReport<string,string>[]> = async {
-        if Array.isEmpty keyValueBatch then return [||] else
+    ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.
+    /// </remarks>
+    member __.ProduceBatch(messageBatch : Message<_, _>[]) : Async<DeliveryReport<string,string>[]> = async {
+        if Array.isEmpty messageBatch then return [||] else
 
         let! ct = Async.CancellationToken
 
         let tcs = TaskCompletionSource<DeliveryReport<_,_>[]>()
-        let numMessages = keyValueBatch.Length
+        let numMessages = messageBatch.Length
         let results = Array.zeroCreate<DeliveryReport<_,_>> numMessages
         let numCompleted = ref 0
 
@@ -168,11 +189,27 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
                 let i = Interlocked.Increment numCompleted
                 results.[i - 1] <- m
                 if i = numMessages then tcs.TrySetResult results |> ignore 
-        for key,value in keyValueBatch do
-            inner.Produce(topic, Message<_,_>(Key=key, Value=value), deliveryHandler=handler)
+
+        for message in messageBatch do
+            inner.Produce(topic, message, deliveryHandler=handler)
+
         inner.Flush(ct)
         return! Async.AwaitTaskCorrect tcs.Task }
 
+    /// <summary>
+    /// Produces a batch of supplied key/value messages. 
+    /// See the other overload.
+    /// </summary>
+    member __.ProduceBatch(messageBatch : seq<string * string>) : Async<DeliveryReport<string,string>[]> = 
+        __.ProduceBatch([| for pair in messageBatch -> Message.create pair |])
+
+    /// <summary>
+    /// Produces a batch of messages with supplied key/value/headers. 
+    /// See the other overload.
+    /// </summary>
+    member __.ProduceBatch(messageBatch : seq<string * string * seq<string * byte[]>>) : Async<DeliveryReport<string,string>[]> = 
+        __.ProduceBatch([| for pair in messageBatch -> Message.createWithHeaders pair |])
+        
     /// Creates and wraps a Confluent.Kafka Producer that affords a best effort batched production mode.
     /// NB See caveats on the `ProduceBatch` API for further detail as to the semantics
     /// Throws ArgumentOutOfRangeException if config has a non-zero linger value as this is absolutely critical to the semantics
