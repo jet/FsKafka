@@ -13,15 +13,21 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ## [Unreleased]
 
 ### Added
-
-- Added overload of `BatchedProducer` to support message headers [#86](https://github.com/jet/FsKafka/pull/86)
-- Added overload of `BatchedProducer` to support passing in `Message[]` [#86](https://github.com/jet/FsKafka/pull/86)
-
 ### Changed
 ### Removed
 ### Fixed
 
-- xmldocs for `BatchedProducer` [#86](https://github.com/jet/FsKafka/pull/86)
+<a name="1.6.3"></a>
+## [1.6.3] - 2021-06-23
+
+### Added
+
+- Added overload of `BatchedProducer` to support message headers [#86](https://github.com/jet/FsKafka/pull/86) :pray: [@deviousasti](https://github.com/deviousasti)
+- Added overload of `BatchedProducer` to support passing in `Message[]` [#86](https://github.com/jet/FsKafka/pull/86) :pray: [@deviousasti](https://github.com/deviousasti)
+
+### Fixed
+
+- xmldocs for `BatchedProducer` [#86](https://github.com/jet/FsKafka/pull/86) :pray: [@deviousasti](https://github.com/deviousasti)
 
 <a name="1.6.2"></a>
 ## [1.6.2] - 2021-02-26
@@ -449,7 +455,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.6.2...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.6.3...HEAD
+[1.6.3]: https://github.com/jet/FsKafka/compare/1.6.2...1.6.3
 [1.6.2]: https://github.com/jet/FsKafka/compare/1.5.6...1.6.2
 [1.5.6]: https://github.com/jet/FsKafka/compare/1.5.5...1.5.6
 [1.5.5]: https://github.com/jet/FsKafka/compare/1.5.4...1.5.5
