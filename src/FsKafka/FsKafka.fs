@@ -95,7 +95,6 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         customize |> Option.iter (fun f -> f c)
         KafkaProducerConfig(c, bootstrapServers)
 
-
 module private Message =
     
     let create(key: string, value: string) =
@@ -105,7 +104,6 @@ module private Message =
         let message = Message<_,_>(Key=key, Value=value, Headers = Headers())
         for header in headers do
             message.Headers.Add(Header header)
-
         message
 
     let noHeaders : seq<string * byte[]> = Seq.empty
