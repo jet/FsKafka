@@ -203,14 +203,14 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     /// See the other overload.
     /// </summary>
     member __.ProduceBatch(messageBatch : seq<string * string>) : Async<DeliveryReport<string,string>[]> = 
-        __.ProduceBatch(messageBatch |> Seq.map Message.create |> Array.ofSeq)
+        __.ProduceBatch([| for pair in messageBatch -> Message.create pair |])
 
     /// <summary>
     /// Produces a batch of messages with supplied key/value/headers. 
     /// See the other overload.
     /// </summary>
     member __.ProduceBatch(messageBatch : seq<string * string * seq<string * byte[]>>) : Async<DeliveryReport<string,string>[]> = 
-        __.ProduceBatch(messageBatch |> Seq.map Message.createWithHeaders |> Array.ofSeq)
+        __.ProduceBatch([| for pair in messageBatch -> Message.createWithHeaders pair |])
         
     /// Creates and wraps a Confluent.Kafka Producer that affords a best effort batched production mode.
     /// NB See caveats on the `ProduceBatch` API for further detail as to the semantics
