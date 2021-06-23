@@ -105,9 +105,7 @@ module private Message =
         for header in headers do
             message.Headers.Add(Header header)
         message
-
-    let noHeaders : seq<string * byte[]> = Seq.empty
-
+    
 /// Creates and wraps a Confluent.Kafka Producer with the supplied configuration
 type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     member __.Inner = inner
