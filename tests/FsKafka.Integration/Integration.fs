@@ -191,7 +191,7 @@ type T1(testOutputHelper) =
             consumedBatches
             |> Seq.forall (not << Array.isEmpty)
 
-        test <@ ``consumed batches should be non-empty`` @> // "consumed batches should all be non-empty")
+        test <@ ``consumed batches should be non-empty`` @> // "consumed batches should all be non-empty"
 
         // Section: assertion checks
         let ``consumed batches should have received the same headers back`` =
@@ -199,8 +199,7 @@ type T1(testOutputHelper) =
             |> Seq.concat
             |> Seq.forall (fun m -> Seq.forall2 (=) m.headers headers)
 
-        test <@ ``consumed batches should be non-empty`` @> // "consumed batches should all be non-empty")
-
+        test <@ ``consumed batches should have received the same headers back`` @> // "consumed batches should have received the same headers back"
 
         let ``batches should be grouped by partition`` =
             consumedBatches

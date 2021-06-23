@@ -95,19 +95,20 @@ type KafkaProducerConfig private (inner, bootstrapServers : string) =
         customize |> Option.iter (fun f -> f c)
         KafkaProducerConfig(c, bootstrapServers)
 
-/// A message header consists of a string key and a byte-encoded value
-type MessageHeaders = seq<string * byte[]>
 
 module private Message =
     
-    let create(key: string, value: string, headers : MessageHeaders) =
+    let create(key: string, value: string) =
+        Message<_,_>(Key=key, Value=value)
+
+    let createWithHeaders(key: string, value: string, headers : seq<string * byte[]>) =
         let message = Message<_,_>(Key=key, Value=value, Headers = Headers())
         for header in headers do
             message.Headers.Add(Header header)
 
         message
 
-    let noHeaders : MessageHeaders = Seq.empty
+    let noHeaders : seq<string * byte[]> = Seq.empty
 
 /// Creates and wraps a Confluent.Kafka Producer with the supplied configuration
 type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
@@ -132,8 +133,8 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
     /// response from the call.
     /// </remarks>
-    member __.ProduceAsync(key : string, value: string, headers : MessageHeaders) : Async<DeliveryResult<string, string>> =
-        let message = Message.create(key, value, headers)
+    member __.ProduceAsync(key : string, value: string, headers : seq<string * byte[]>) : Async<DeliveryResult<string, string>> =
+        let message = Message.createWithHeaders(key, value, headers)
         __.ProduceAsync(message)
 
     /// <summary> Produces a single message, yielding a response upon completion/failure of the ack (>3ms to complete)</summary>
@@ -143,7 +144,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// response from the call.
     /// </remarks>
     member __.ProduceAsync(key : string, value : string) : Async<DeliveryResult<string, string>> =
-        __.ProduceAsync(key, value, Message.noHeaders)
+        __.ProduceAsync(Message.create (key, value))
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string): KafkaProducer =
         if String.IsNullOrEmpty topic then nullArg "topic"
@@ -172,15 +173,15 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     ///    Note that the delivery and/or write order may vary from the supplied order unless `maxInFlight` is 1 (which massively constrains throughput).
     ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.
     /// </remarks>
-    member __.ProduceBatch(messageBatch : seq<string * string * MessageHeaders>) : Async<DeliveryReport<string,string>[]> = async {
+    member __.ProduceBatch(messageBatch : seq<Message<_, _>>) : Async<DeliveryReport<string,string>[]> = async {
         match Array.ofSeq messageBatch with
         | [||] -> return [||] 
-        | kvhBatch ->
+        | batch ->
 
         let! ct = Async.CancellationToken
 
         let tcs = TaskCompletionSource<DeliveryReport<_,_>[]>()
-        let numMessages = kvhBatch.Length
+        let numMessages = batch.Length
         let results = Array.zeroCreate<DeliveryReport<_,_>> numMessages
         let numCompleted = ref 0
 
@@ -195,8 +196,8 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
                 results.[i - 1] <- m
                 if i = numMessages then tcs.TrySetResult results |> ignore 
 
-        for message in kvhBatch do
-            inner.Produce(topic, Message.create message, deliveryHandler=handler)
+        for message in batch do
+            inner.Produce(topic, message, deliveryHandler=handler)
 
         inner.Flush(ct)
         return! Async.AwaitTaskCorrect tcs.Task }
@@ -206,7 +207,14 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     /// See the other overload.
     /// </summary>
     member __.ProduceBatch(messageBatch : seq<string * string>) : Async<DeliveryReport<string,string>[]> = 
-        __.ProduceBatch(messageBatch |> Seq.map(fun (key, value) -> key, value, Message.noHeaders))
+        __.ProduceBatch(messageBatch |> Seq.map Message.create)
+
+    /// <summary>
+    /// Produces a batch of messages with supplied key/value/headers. 
+    /// See the other overload.
+    /// </summary>
+    member __.ProduceBatch(messageBatch : seq<string * string * seq<string * byte[]>>) : Async<DeliveryReport<string,string>[]> = 
+        __.ProduceBatch(messageBatch |> Seq.map Message.createWithHeaders)
         
     /// Creates and wraps a Confluent.Kafka Producer that affords a best effort batched production mode.
     /// NB See caveats on the `ProduceBatch` API for further detail as to the semantics
