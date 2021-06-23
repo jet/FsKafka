@@ -171,7 +171,7 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     ///    Note that the delivery and/or write order may vary from the supplied order unless `maxInFlight` is 1 (which massively constrains throughput).
     ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.
     /// </remarks>
-    member __.ProduceBatch(messageBatch : seq<Message<_, _>>) : Async<DeliveryReport<string,string>[]> = async {
+    member __.ProduceBatch(messageBatch : Message<_, _>[]) : Async<DeliveryReport<string,string>[]> = async {
         match Array.ofSeq messageBatch with
         | [||] -> return [||] 
         | batch ->
@@ -205,14 +205,14 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     /// See the other overload.
     /// </summary>
     member __.ProduceBatch(messageBatch : seq<string * string>) : Async<DeliveryReport<string,string>[]> = 
-        __.ProduceBatch(messageBatch |> Seq.map Message.create)
+        __.ProduceBatch(messageBatch |> Seq.map Message.create |> Array.ofSeq)
 
     /// <summary>
     /// Produces a batch of messages with supplied key/value/headers. 
     /// See the other overload.
     /// </summary>
     member __.ProduceBatch(messageBatch : seq<string * string * seq<string * byte[]>>) : Async<DeliveryReport<string,string>[]> = 
-        __.ProduceBatch(messageBatch |> Seq.map Message.createWithHeaders)
+        __.ProduceBatch(messageBatch |> Seq.map Message.createWithHeaders |> Array.ofSeq)
         
     /// Creates and wraps a Confluent.Kafka Producer that affords a best effort batched production mode.
     /// NB See caveats on the `ProduceBatch` API for further detail as to the semantics
