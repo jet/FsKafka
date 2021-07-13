@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "FsKafka.Integration": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "TEST_KAFKA_BROKER": "1"
+      }
+    }
+  }
+}
