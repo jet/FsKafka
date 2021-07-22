@@ -16,7 +16,8 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 ### Removed
 
-- Remove FsKafka0, the older, less loved shimmed version which now be subject to the [scream test](http://www.v-wiki.net/the-scream-test/) with [#85](https://github.com/jet/FsKafka/pull/87)
+- Remove FsKafka0, the older, less loved shimmed version which now be subject to the [scream test](http://www.v-wiki.net/the-scream-test/) with [#87](https://github.com/jet/FsKafka/pull/87)
+- Remove targeting for `net461` - support only `netstandard 2.0` with [#88](https://github.com/jet/FsKafka/pull/88)
 
 ### Fixed
 
