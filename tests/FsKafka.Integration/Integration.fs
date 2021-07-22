@@ -65,7 +65,7 @@ module Helpers =
     type BatchedConsumer with
         member c.StopAfter(delay : TimeSpan) =
             async { 
-                do! Async.Sleep delay
+                do! Async.Sleep (int delay.TotalMilliseconds)
                 do c.Stop() 
             } |> Async.Start
 
