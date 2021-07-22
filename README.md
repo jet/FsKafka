@@ -38,7 +38,7 @@ The [templates](#templates) are the best way to see how to consume it; these ins
 
 NB The tests are reliant on a `TEST_KAFKA_BROKER` environment variable pointing to a Broker that has been configured to auto-create ephemeral Kafka Topics as required by the tests (each test run writes to a guid-named topic)
 
-### build, including tests on netcoreapp2.1
+### build, including tests on netcoreapp3.1
 
 ```powershell
 export TEST_KAFKA_BROKER="<server>:9092"
