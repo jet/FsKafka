@@ -6,7 +6,7 @@ F# friendly wrapper for `Confluent.Kafka`, with minimal dependencies or addition
 
 ## Usage
 
-FsKafka is delivered as a multi-targeted [Nuget package](https://www.nuget.org/packages/FsKafka/) targeting `net461` (F# 3.1+) and `netstandard2.0` (F# 4.5+) profiles.
+FsKafka is delivered as a [Nuget package](https://www.nuget.org/packages/FsKafka/) targeting `netstandard2.0` and F# >= 4.5.
 
 ```powershell
 Install-Package FsKafka
@@ -38,7 +38,7 @@ The [templates](#templates) are the best way to see how to consume it; these ins
 
 NB The tests are reliant on a `TEST_KAFKA_BROKER` environment variable pointing to a Broker that has been configured to auto-create ephemeral Kafka Topics as required by the tests (each test run writes to a guid-named topic)
 
-### build, including tests on net461 and netcoreapp2.1
+### build, including tests on netcoreapp3.1
 
 ```powershell
 export TEST_KAFKA_BROKER="<server>:9092"

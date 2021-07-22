@@ -64,7 +64,10 @@ module Helpers =
 
     type BatchedConsumer with
         member c.StopAfter(delay : TimeSpan) =
-            Task.Delay(delay).ContinueWith(fun (_:Task) -> c.Stop()) |> ignore
+            async { 
+                do! Async.Sleep (int delay.TotalMilliseconds)
+                do c.Stop() 
+            } |> Async.Start
 
     type TestMessage = { producerId : int ; messageId : int }
 
