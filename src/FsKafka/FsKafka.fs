@@ -254,10 +254,6 @@ module Core =
                 while Volatile.Read(&inFlightBytes) > minInFlightBytes && not ct.IsCancellationRequested do
                     showConsumerWeAreStillAlive ()
                 log.Information "Consumer resuming polling"
-        [<Obsolete "Please use overload with ?busyWork=None">]
-        // TODO remove ?busyWork=None in internal call when removing this overload
-        member this.AwaitThreshold(ct : CancellationToken, consumer : IConsumer<_,_>) =
-           this.AwaitThreshold(ct, consumer, ?busyWork=None)
 
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
