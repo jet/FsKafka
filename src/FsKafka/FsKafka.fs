@@ -254,10 +254,6 @@ module Core =
                 while Volatile.Read(&inFlightBytes) > minInFlightBytes && not ct.IsCancellationRequested do
                     showConsumerWeAreStillAlive ()
                 log.Information "Consumer resuming polling"
-        [<Obsolete "Please use overload with ?busyWork=None">]
-        // TODO remove ?busyWork=None in internal call when removing this overload
-        member this.AwaitThreshold(ct : CancellationToken, consumer : IConsumer<_,_>) =
-           this.AwaitThreshold(ct, consumer, ?busyWork=None)
 
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
@@ -503,7 +499,7 @@ module private ConsumerImpl =
         // run the consumer
         let ct = cts.Token
         try while not ct.IsCancellationRequested do
-                counter.AwaitThreshold(ct, consumer, ?busyWork=None)
+                counter.AwaitThreshold(ct, consumer)
                 try let result = consumer.Consume(ct) // NB TimeSpan overload yields AVEs on 1.0.0-beta2
                     if result <> null then
                         counter.Delta(+approximateMessageBytes result)
