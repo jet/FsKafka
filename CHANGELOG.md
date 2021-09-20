@@ -14,14 +14,22 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+### Removed
+### Fixed
+
+
+<a name="1.7.0"></a>
+## [1.7.0] - 2021-09-20
+
+### Changed
+
 - Target `Confluent.Kafka [1.7.0]`, `librdkafka.redist [1.7.0]` [#89](https://github.com/jet/FsKafka/pull/89)
+
 ### Removed
 
 - Remove FsKafka0, the older, less loved shimmed version which now be subject to the [scream test](http://www.v-wiki.net/the-scream-test/) with [#87](https://github.com/jet/FsKafka/pull/87)
 - Remove targeting for `net461` - support only `netstandard 2.0` with [#88](https://github.com/jet/FsKafka/pull/88)
 - Remove `AwaitThreshold` in `InFlightMessageCounter` [#89](https://github.com/jet/FsKafka/pull/89)
-
-### Fixed
 
 <a name="1.6.3"></a>
 ## [1.6.3] - 2021-06-23
@@ -461,7 +469,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.6.3...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.7.0...HEAD
+[1.7.0]: https://github.com/jet/FsKafka/compare/1.6.3...1.7.0
 [1.6.3]: https://github.com/jet/FsKafka/compare/1.6.2...1.6.3
 [1.6.2]: https://github.com/jet/FsKafka/compare/1.5.6...1.6.2
 [1.5.6]: https://github.com/jet/FsKafka/compare/1.5.5...1.5.6
