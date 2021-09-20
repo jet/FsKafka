@@ -499,7 +499,7 @@ module private ConsumerImpl =
         // run the consumer
         let ct = cts.Token
         try while not ct.IsCancellationRequested do
-                counter.AwaitThreshold(ct, consumer, ?busyWork=None)
+                counter.AwaitThreshold(ct, consumer)
                 try let result = consumer.Consume(ct) // NB TimeSpan overload yields AVEs on 1.0.0-beta2
                     if result <> null then
                         counter.Delta(+approximateMessageBytes result)
