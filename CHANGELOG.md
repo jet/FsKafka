@@ -14,12 +14,14 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
+
+- Update global.json to use SDK version `6.0.201`, use `DotNet.ReproducibleBuilds` [#90](https://github.com/jet/FsKafka/pull/90) [#93](https://github.com/jet/FsKafka/pull/93)
+
 ### Removed
 ### Fixed
 
-- Remove extraneous variation from `AwaitTaskCorrect` by switching to canonical implementation [#92](https://github.com/jet/FsKafka/pull/92)
 - Fix CI to stop emitting builds with incorrect `AssemblyVersion 1.0.0.0` (updated MinVer to `2.5.0`) [#90](https://github.com/jet/FsKafka/pull/90)
-- Update global.json to use SDK version `5.0.200` [#90](https://github.com/jet/FsKafka/pull/90)
+- Remove extraneous variation from `AwaitTaskCorrect` by switching to canonical implementation [#92](https://github.com/jet/FsKafka/pull/92)
 
 <a name="1.7.0"></a>
 ## [1.7.0] - 2021-09-20
