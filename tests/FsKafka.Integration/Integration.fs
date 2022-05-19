@@ -52,15 +52,13 @@ module Helpers =
     let newId () = let g = System.Guid.NewGuid() in g.ToString("N")
 
     type Async with
-        static member ParallelThrottled degreeOfParallelism jobs =
-            let s = new SemaphoreSlim(degreeOfParallelism)
-            jobs
-            |> Seq.map (fun j -> async {
-                let! ct = Async.CancellationToken
-                do! s.WaitAsync ct |> Async.AwaitTask
-                try return! j
-                finally s.Release() |> ignore })
-            |> Async.Parallel
+
+        // Unsafe in the name re https://github.com/dotnet/fsharp/issues/13165
+        // Reasonable in the context of this codebase as we do not exceed 1200 computations
+        // When there's an in-the-box ParallelThrottled, or this codebase is known to target an FSharp.Core that does not suffer from this issue,
+        // the Unsafe part of the name (and this note) can be removed 
+        static member ParallelThrottledUnsafe dop computations = 
+            Async.Parallel(computations, maxDegreeOfParallelism = dop)
 
     type BatchedConsumer with
         member c.StopAfter(delay : TimeSpan) =
@@ -109,7 +107,7 @@ module Helpers =
                 )
                 |> Seq.chunkBySize 100
                 |> Seq.map producer.ProduceBatch
-                |> Async.ParallelThrottled 7
+                |> Async.ParallelThrottledUnsafe 7
 
             return Array.concat results
         }
