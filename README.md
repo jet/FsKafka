@@ -6,7 +6,7 @@ F# friendly wrapper for `Confluent.Kafka`, with minimal dependencies or addition
 
 ## Usage
 
-FsKafka is delivered as a [Nuget package](https://www.nuget.org/packages/FsKafka/) targeting `netstandard2.0` and F# >= 4.5~~~~.
+FsKafka is delivered as a [Nuget package](https://www.nuget.org/packages/FsKafka/) targeting `netstandard2.0` and F# >= 4.5.
 
 ```powershell
 Install-Package FsKafka
