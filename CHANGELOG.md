@@ -17,6 +17,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+- Remove extraneous variation from `AwaitTaskCorrect` by switching to canonical implementation [#92](https://github.com/jet/FsKafka/pull/92)
 - Fix CI to stop emitting builds with incorrect `AssemblyVersion 1.0.0.0` (updated MinVer to `2.5.0`) [#90](https://github.com/jet/FsKafka/pull/90)
 - Update global.json to use SDK version `5.0.200` [#90](https://github.com/jet/FsKafka/pull/90)
 
