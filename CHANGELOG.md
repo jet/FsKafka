@@ -14,11 +14,17 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 ### Changed
-
-- Update global.json to use SDK version `6.0.300`, use `DotNet.ReproducibleBuilds` [#90](https://github.com/jet/FsKafka/pull/90) [#93](https://github.com/jet/FsKafka/pull/93)
-- Target [`Confluent.Kafka [1.9.0]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#190), [`librdkafka.redist [1.9.0]`](https://github.com/edenhill/librdkafka/releases/tag/v1.9.0) [#91](https://github.com/jet/FsKafka/pull/91)
-
 ### Removed
+### Fixed
+
+<a name="1.9.0"></a>
+## [1.9.0] - 2022-06-18
+
+### Changed
+
+- Target [`Confluent.Kafka [1.9.0]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#190), [`librdkafka.redist [1.9.0]`](https://github.com/edenhill/librdkafka/releases/tag/v1.9.0) [#91](https://github.com/jet/FsKafka/pull/91)
+- Update global.json to use SDK version `6.0.300`, use `DotNet.ReproducibleBuilds` [#90](https://github.com/jet/FsKafka/pull/90) [#93](https://github.com/jet/FsKafka/pull/93)
+
 ### Fixed
 
 - Fix CI to stop emitting builds with incorrect `AssemblyVersion 1.0.0.0` (updated MinVer to `2.5.0`) [#90](https://github.com/jet/FsKafka/pull/90)
@@ -475,7 +481,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.7.0...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.9.0...HEAD
+[1.9.0]: https://github.com/jet/FsKafka/compare/1.7.0...1.9.0
 [1.7.0]: https://github.com/jet/FsKafka/compare/1.6.3...1.7.0
 [1.6.3]: https://github.com/jet/FsKafka/compare/1.6.2...1.6.3
 [1.6.2]: https://github.com/jet/FsKafka/compare/1.5.6...1.6.2
