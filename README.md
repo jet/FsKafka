@@ -2,7 +2,7 @@
 
 F# friendly wrapper for `Confluent.Kafka`, with minimal dependencies or additional abstractions (but see [related repos](#related-repos)). 
 
-`FsKafka` wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. [Depends](https://www.fuget.org/packages/FsKafka) on [`Confluent.Kafka [1.9.0]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#182), [`librdkafka.redist [1.9.0]`](https://github.com/edenhill/librdkafka/blob/master/CHANGELOG.md#librdkafka-v182) (pinned to ensure we use a tested pairing), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
+`FsKafka` wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. [Depends](https://www.fuget.org/packages/FsKafka) on [`Confluent.Kafka [1.9.0]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#190), [`librdkafka.redist [1.9.0]`](https://github.com/edenhill/librdkafka/releases/tag/v1.9.0) (pinned to ensure we use a tested pairing), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
 
 ## Usage
 
