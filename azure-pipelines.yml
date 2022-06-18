@@ -17,11 +17,12 @@ jobs:
       BUILD_ID: $(BUILD.BUILDNUMBER) 
   - task: PublishBuildArtifacts@1
     inputs:
-      pathtoPublish: 'bin/nupkg'
+      pathtoPublish: 'bin'
       artifactName: 'nupkgs'
+      
 - job: Linux
   pool:
-    vmImage: 'ubuntu-18.04'
+    vmImage: 'ubuntu-latest'
   steps:
     - script: |
         docker network create kafka-net
@@ -41,9 +42,15 @@ jobs:
         testResultsFormat: 'VSTest'
         testResultsFiles: 'tests/**/*.trx'
       condition: succeededOrFailed()
+      
 - job: MacOS
   pool:
     vmImage: 'macOS-latest'
   steps:
+  - task: UseDotNet@2
+    displayName: 'Install .NET Core sdk'
+    inputs:
+      packageType: sdk
+      version: 6.x
   - script: dotnet pack build.proj
     displayName: dotnet pack build.proj
