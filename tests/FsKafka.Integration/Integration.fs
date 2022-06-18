@@ -9,7 +9,6 @@ open System
 open System.Collections.Concurrent
 open System.ComponentModel
 open System.Threading
-open System.Threading.Tasks
 open Xunit
 
 module Config =
@@ -35,7 +34,7 @@ module Helpers =
             formatter.Format(logEvent, writer);
             writer |> string |> testOutput.WriteLine
             writer |> string |> System.Diagnostics.Debug.WriteLine
-        interface Serilog.Core.ILogEventSink with member __.Emit logEvent = writeSerilogEvent logEvent
+        interface Serilog.Core.ILogEventSink with member _.Emit logEvent = writeSerilogEvent logEvent
 
     let createLogger sink =
         LoggerConfiguration()
@@ -49,7 +48,7 @@ module Helpers =
         | x when String.IsNullOrEmpty x -> invalidOp "missing environment variable 'TEST_KAFKA_BROKER'"
         | x -> Uri x |> Config.validateBrokerUri
 
-    let newId () = let g = System.Guid.NewGuid() in g.ToString("N")
+    let newId () = let g = Guid.NewGuid() in g.ToString("N")
 
     type Async with
 
@@ -82,11 +81,7 @@ module Helpers =
     type ConsumerCallback = BatchedConsumer -> ConsumedTestMessage [] -> Async<unit>
 
     let headers = 
-    #if !KAFKA0 
         seq ["kafka", [| 0xDEuy; 0xADuy; 0xBEuy; 0xEFuy |]]
-    #else
-        seq []
-    #endif
 
     let runProducers log broker (topic : string) (numProducers : int) (messagesPerProducer : int) = async {
         let runProducer (producerId : int) = async {
@@ -99,11 +94,7 @@ module Helpers =
                 |> Seq.map (fun msgId ->
                     let key = string msgId
                     let value = JsonConvert.SerializeObject { producerId = producerId ; messageId = msgId }
-                #if KAFKA0
-                    key, value
-                #else
                     key, value, headers
-                #endif                    
                 )
                 |> Seq.chunkBySize 100
                 |> Seq.map producer.ProduceBatch
@@ -120,13 +111,9 @@ module Helpers =
             let deserialize result =
                 let message = Binding.message result
                 let headers = 
-                #if !KAFKA0 
                     match message.Headers with 
                     | null -> Seq.empty 
                     | h -> h |> Seq.map(fun h -> h.Key, h.GetValueBytes())
-                #else
-                    Seq.empty
-                #endif
 
                 { 
                     consumerId = consumerId 
@@ -139,14 +126,14 @@ module Helpers =
             let consumerCell = ref None
             let rec getConsumer() =
                 // avoid potential race conditions by polling
-                match !consumerCell with
+                match consumerCell.Value with
                 | None -> Thread.SpinWait 20; getConsumer()
                 | Some c -> c
 
             let partitionHandler batch = handler (getConsumer()) (Array.map deserialize batch)
             use consumer = BatchedConsumer.Start(log, config, partitionHandler)
 
-            consumerCell := Some consumer
+            consumerCell.Value <- Some consumer
 
             timeout |> Option.iter consumer.StopAfter
 
@@ -158,7 +145,7 @@ module Helpers =
 
 type FactIfBroker() =
     inherit FactAttribute()
-    override __.Skip = if null <> Environment.GetEnvironmentVariable "TEST_KAFKA_BROKER" then null else "Skipping as no TEST_KAFKA_BROKER supplied"
+    override _.Skip = if null <> Environment.GetEnvironmentVariable "TEST_KAFKA_BROKER" then null else "Skipping as no TEST_KAFKA_BROKER supplied"
 
 type T1(testOutputHelper) =
     let log, broker = createLogger (TestOutputAdapter testOutputHelper), getTestBroker ()
@@ -258,7 +245,7 @@ type T2(testOutputHelper) =
         do! runConsumers log config 1 None 
                 (fun c b -> async { if Interlocked.Add(messageCount, b.Length) >= numMessages then c.Stop() })
 
-        test <@ numMessages = !messageCount @>
+        test <@ numMessages = messageCount.Value @>
 
         let messageCount = ref 0
         let groupId2 = newId()
@@ -266,7 +253,7 @@ type T2(testOutputHelper) =
         do! runConsumers log config 1 None
                 (fun c b -> async { if Interlocked.Add(messageCount, b.Length) >= numMessages then c.Stop() })
 
-        test <@ numMessages = !messageCount @>
+        test <@ numMessages = messageCount.Value @>
     }
 
     let [<FactIfBroker>] ``Spawning a new consumer with same consumer group id should not receive new messages`` () = async {
@@ -284,7 +271,7 @@ type T2(testOutputHelper) =
                     if Interlocked.Add(messageCount, b.Length) >= numMessages then 
                         c.StopAfter(TimeSpan.FromSeconds 1.) }) // cancel after 1 second to allow offsets to be stored
 
-        test <@ numMessages = !messageCount @>
+        test <@ numMessages = messageCount.Value @>
 
         // expected to read no messages from the subsequent consumer
         let messageCount = ref 0
@@ -292,7 +279,7 @@ type T2(testOutputHelper) =
                 (fun c b -> async { 
                     if Interlocked.Add(messageCount, b.Length) >= numMessages then c.Stop() })
 
-        test <@ 0 = !messageCount @>
+        test <@ 0 = messageCount.Value @>
     }
 
 // separated test type to allow the tests to run in parallel
@@ -314,7 +301,7 @@ type T3(testOutputHelper) =
                     if Interlocked.Add(messageCount, b.Length) >= numMessages then 
                         c.StopAfter(TimeSpan.FromSeconds 1.) }) // cancel after 1 second to allow offsets to be committed)
 
-        test <@ numMessages = !messageCount @>
+        test <@ numMessages = messageCount.Value @>
 
         let! _ = runProducers log broker topic 1 numMessages // produce more messages
 
@@ -326,7 +313,7 @@ type T3(testOutputHelper) =
                     if Interlocked.Add(messageCount, b.Length) >= numMessages then 
                         c.StopAfter(TimeSpan.FromSeconds 1.) }) // cancel after 1 second to allow offsets to be committed)
 
-        test <@ numMessages = !messageCount @>
+        test <@ numMessages = messageCount.Value @>
     }
 
     let [<FactIfBroker>] ``Consumers should never schedule two batches of the same partition concurrently`` () = async {
@@ -355,7 +342,7 @@ type T3(testOutputHelper) =
 
         do! runConsumers log config 1 None
                 (fun c b -> async {
-                    let partition = Binding.partitionValue b.[0].result.Partition
+                    let partition = Binding.partitionValue b[0].result.Partition
 
                     // check batch sizes are bounded by maxBatchSize
                     test <@ b.Length <= maxBatchSize @> // "batch sizes should never exceed maxBatchSize")
@@ -368,8 +355,8 @@ type T3(testOutputHelper) =
                     // check for message monotonicity
                     let offset = getPartitionOffset partition
                     for msg in b do
-                        Assert.True((let o = msg.result.Offset in o.Value) > !offset, "offset for partition should be monotonic")
-                        offset := let o = msg.result.Offset in o.Value
+                        Assert.True((let o = msg.result.Offset in o.Value) > offset.Value, "offset for partition should be monotonic")
+                        offset.Value <- let o = msg.result.Offset in o.Value
 
                     do! Async.Sleep 100
 
@@ -377,7 +364,7 @@ type T3(testOutputHelper) =
 
                     if Interlocked.Add(globalMessageCount, b.Length) >= numMessages then c.Stop() })
 
-        test <@ numMessages = !globalMessageCount @>
+        test <@ numMessages = globalMessageCount.Value @>
     }
 
 // separated test type to allow the tests to run in parallel
@@ -450,7 +437,7 @@ type T4(testOutputHelper) =
         let! res = async {
             use consumer = BatchedConsumer.Start(log, consumerCfg, handle)
             consumer.StopAfter (TimeSpan.FromSeconds 20.)
-            use _ = FsKafka.KafkaMonitor(log).Start(consumer.Inner, consumerCfg.Inner.GroupId)
+            use _ = KafkaMonitor(log).Start(consumer.Inner, consumerCfg.Inner.GroupId)
             return! consumer.AwaitShutdown() |> Async.Catch
         }
         

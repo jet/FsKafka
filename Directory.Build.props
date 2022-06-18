@@ -14,7 +14,6 @@
     
     <WarningLevel>5</WarningLevel>
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
-    <DisableImplicitSystemValueTupleReference>true</DisableImplicitSystemValueTupleReference>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 

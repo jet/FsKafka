@@ -5,7 +5,6 @@ namespace FsKafka
 open Confluent.Kafka
 open Serilog
 open System
-open System.Diagnostics
 open System.Threading
 
 type PartitionResult =
@@ -15,11 +14,6 @@ type PartitionResult =
     | Healthy
 
 module MonitorImpl =
-#if NET461
-    module Array =
-        let head xs = Seq.head xs
-        let last xs = Seq.last xs
-#endif
     module private Map =
         let mergeChoice (f : 'a -> Choice<'b * 'c, 'b, 'c> -> 'd) (map1 : Map<'a, 'b>) (map2 : Map<'a, 'c>) : Map<'a, 'd> =
           Set.union (map1 |> Seq.map (fun k -> k.Key) |> set) (map2 |> Seq.map (fun k -> k.Key) |> set)
@@ -147,25 +141,25 @@ module MonitorImpl =
         let buffer : 'A [] = Array.zeroCreate capacity
         let mutable head,tail,size = 0,-1,0
 
-        member __.TryCopyFull() =
+        member _.TryCopyFull() =
             if size <> capacity then None
             else
                 let arr = Array.zeroCreate size
                 let mutable i = head
                 for x = 0 to size - 1 do
-                    arr.[x] <- buffer.[i % capacity]
+                    arr[x] <- buffer[i % capacity]
                     i <- i + 1
                 Some arr
 
-        member __.Add(x : 'A) =
+        member _.Add(x : 'A) =
             tail <- (tail + 1) % capacity
-            buffer.[tail] <- x
+            buffer[tail] <- x
             if (size < capacity) then
                 size <- size + 1
             else
                 head <- (head + 1) % capacity
 
-        member __.Clear() =
+        member _.Clear() =
             head <- 0
             tail <- -1
             size <- 0
@@ -269,7 +263,7 @@ module MonitorImpl =
                 onStatus topic group states }
 
         let rec loop failCount = async {
-            let sw = Stopwatch.StartNew()
+            let sw = System.Diagnostics.Stopwatch.StartNew()
             let! failCount = async {
                 try if validateAssignments () then
                         do! checkConsumerProgress()
@@ -304,7 +298,7 @@ module MonitorImpl =
                     match res with
                     | Choice1Of3 (), _ -> ()
                     | Choice2Of3 (), errs ->
-                        let lag = function (partitionId, ErrorPartitionStalled lag) -> Some (partitionId,lag) | x -> failwithf "mis-mapped %A" x
+                        let lag = function partitionId, ErrorPartitionStalled lag -> Some (partitionId,lag) | x -> failwithf "mis-mapped %A" x
                         log.Error("Monitoring... {topic}/{group} Stalled with backlogs on {@stalled} [(partition,lag)]", topic, group, errs |> Seq.choose lag)
                     | Choice3Of3 (), warns ->
                         log.Warning("Monitoring... {topic}/{group} Growing lags on {@partitionIds}", topic, group, warns |> Seq.map fst)
@@ -327,11 +321,11 @@ module MonitorImpl =
 /// and then map that to a per-partition status for each partition that the consumer being observed has been assigned
 type KafkaMonitor<'k,'v>
     (   log : ILogger,
-        /// Interval between checks of high/low watermarks. Default 30s
+        // Interval between checks of high/low watermarks. Default 30s
         ?interval,
-        /// Number if readings per partition to use in order to make inferences. Default 10 (at default interval of 30s, implies a 5m window).
+        // Number if readings per partition to use in order to make inferences. Default 10 (at default interval of 30s, implies a 5m window).
         ?windowSize,
-        /// Number of failed calls to broker that should trigger discarding of buffered readings in order to avoid false positives. Default 3.
+        // Number of failed calls to broker that should trigger discarding of buffered readings in order to avoid false positives. Default 3.
         ?failResetCount) =
     let failResetCount = defaultArg failResetCount 3
     let interval = defaultArg interval (TimeSpan.FromSeconds 30.)
@@ -340,14 +334,14 @@ type KafkaMonitor<'k,'v>
 
     /// Periodically supplies the status for all assigned partitions (whenever we've gathered `windowSize` of readings)
     /// Subscriber can e.g. use this to force a consumer restart if no progress is being made
-    [<CLIEvent>] member __.OnStatus = onStatus.Publish
+    [<CLIEvent>] member _.OnStatus = onStatus.Publish
 
     /// Raised whenever call to broker to ascertain watermarks has failed
     /// Subscriber can e.g. raise an alert if enough consecutive failures have occurred
-    [<CLIEvent>] member __.OnCheckFailed = onCheckFailed.Publish
+    [<CLIEvent>] member _.OnCheckFailed = onCheckFailed.Publish
 
     // One of these runs per topic
-    member private __.Pump(consumer, topic, group) = async {
+    member private _.Pump(consumer, topic, group) = async {
         let! ct = Async.CancellationToken
         let onQuery res =
             MonitorImpl.Logging.logLatest log topic group res
@@ -361,8 +355,8 @@ type KafkaMonitor<'k,'v>
         return! MonitorImpl.run consumer (interval,windowSize,failResetCount) topic group (onQuery,onCheckFailed,onStatus)
     }
     /// Commences a monitoring task per subscribed topic 
-    member __.Start(target : IConsumer<'k,'v>, group) = 
+    member m.Start(target : IConsumer<'k,'v>, group) = 
         let cts = new CancellationTokenSource()
         for topic in target.Subscription do
-            Async.Start(__.Pump(target, topic, group), cts.Token)
-        { new IDisposable with member __.Dispose() = cts.Cancel() }
+            Async.Start(m.Pump(target, topic, group), cts.Token)
+        { new IDisposable with member _.Dispose() = cts.Cancel() }

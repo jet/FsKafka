@@ -12,7 +12,7 @@ open System.Threading.Tasks
 
 module Binding =
 
-    let message (x : Confluent.Kafka.ConsumeResult<string, string>) = x.Message
+    let message (x : ConsumeResult<string, string>) = x.Message
     let offsetValue (x : Offset) : int64 = x.Value
     let partitionValue (x : Partition) : int = x.Value
     let internal makeTopicPartition (topic : string) (partition : int) = TopicPartition(topic, Partition partition)
@@ -36,39 +36,39 @@ type Batching =
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaProducerConfig private (inner, bootstrapServers : string) =
-    member __.Inner : ProducerConfig = inner
-    member __.BootstrapServers = bootstrapServers
-    member __.Acks = let v = inner.Acks in v.Value
-    member __.Linger = let v = inner.LingerMs in v.Value
-    member __.MaxInFlight = let v = inner.MaxInFlight in v.Value
-    member __.Compression = let v = inner.CompressionType in v.GetValueOrDefault(CompressionType.None)
+    member _.Inner : ProducerConfig = inner
+    member _.BootstrapServers = bootstrapServers
+    member _.Acks = let v = inner.Acks in v.Value
+    member _.Linger = let v = inner.LingerMs in v.Value
+    member _.MaxInFlight = let v = inner.MaxInFlight in v.Value
+    member _.Compression = let v = inner.CompressionType in v.GetValueOrDefault(CompressionType.None)
 
     /// Creates and wraps a Confluent.Kafka ProducerConfig with the specified settings
     static member Create
         (   clientId : string, bootstrapServers : string, acks,
-            /// Defines combination of linger/maxInFlight settings to effect desired batching semantics
+            // Defines combination of linger/maxInFlight settings to effect desired batching semantics
             batching : Batching,
-            /// Message compression. Default: None.
+            // Message compression. Default: None.
             ?compression,
-            /// Number of retries. Confluent.Kafka default: 2. Default: 60.
+            // Number of retries. Confluent.Kafka default: 2. Default: 60.
             ?retries,
-            /// Backoff interval. Confluent.Kafka default: 100ms. Default: 1s.
+            // Backoff interval. Confluent.Kafka default: 100ms. Default: 1s.
             ?retryBackoff,
-            /// Statistics Interval. Default: no stats.
+            // Statistics Interval. Default: no stats.
             ?statisticsInterval,
-            /// Ack timeout (assuming Acks != Acks.Zero). Confluent.Kafka default: 5s.
+            // Ack timeout (assuming Acks != Acks.Zero). Confluent.Kafka default: 5s.
             ?requestTimeout,
-            /// Confluent.Kafka default: false. Defaults to true.
+            // Confluent.Kafka default: false. Defaults to true.
             ?socketKeepAlive,
-            /// Partition algorithm. Default: `ConsistentRandom`.
+            // Partition algorithm. Default: `ConsistentRandom`.
             ?partitioner,
-            /// Confluent.Kafka default: 1mB
+            // Confluent.Kafka default: 1mB
             ?messageMaxBytes,
-            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
+            // Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string, string>,
-            /// Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
+            // Miscellaneous configuration parameters to be passed to the underlying Confluent.Kafka producer configuration.
             ?custom : #seq<KeyValuePair<string, string>>,
-            /// Postprocesses the ProducerConfig after the rest of the rules have been applied
+            // Postprocesses the ProducerConfig after the rest of the rules have been applied
             ?customize : ProducerConfig -> unit) =
         let linger, maxInFlight =
             match batching with
@@ -108,8 +108,8 @@ module private Message =
     
 /// Creates and wraps a Confluent.Kafka Producer with the supplied configuration
 type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
-    member __.Inner = inner
-    member __.Topic = topic
+    member _.Inner = inner
+    member _.Topic = topic
 
     interface IDisposable with member _.Dispose() = inner.Dispose()
 
@@ -119,7 +119,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
     /// response from the call.
     /// </remarks>
-    member __.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<string, string>> = async {
+    member _.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<string, string>> = async {
         let! ct = Async.CancellationToken
         return! inner.ProduceAsync(topic, message, ct) |> Async.AwaitTaskCorrect }
 
@@ -129,9 +129,9 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
     /// response from the call.
     /// </remarks>
-    member __.ProduceAsync(key : string, value: string, headers : seq<string * byte[]>) : Async<DeliveryResult<string, string>> =
+    member p.ProduceAsync(key : string, value: string, headers : seq<string * byte[]>) : Async<DeliveryResult<string, string>> =
         let message = Message.createWithHeaders(key, value, headers)
-        __.ProduceAsync(message)
+        p.ProduceAsync(message)
 
     /// <summary> Produces a single message, yielding a response upon completion/failure of the ack (>3ms to complete)</summary>
     /// <remarks>
@@ -139,8 +139,8 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
     /// response from the call.
     /// </remarks>
-    member __.ProduceAsync(key : string, value : string) : Async<DeliveryResult<string, string>> =
-        __.ProduceAsync(Message.create (key, value))
+    member p.ProduceAsync(key : string, value : string) : Async<DeliveryResult<string, string>> =
+        p.ProduceAsync(Message.create (key, value))
 
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string): KafkaProducer =
         if String.IsNullOrEmpty topic then nullArg "topic"
@@ -154,10 +154,10 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
         new KafkaProducer(p, topic)
 
 type BatchedProducer private (inner : IProducer<string, string>, topic : string) =
-    member __.Inner = inner
-    member __.Topic = topic
+    member _.Inner = inner
+    member _.Topic = topic
 
-    interface IDisposable with member __.Dispose() = inner.Dispose()
+    interface IDisposable with member _.Dispose() = inner.Dispose()
 
     /// <summary>
     /// Produces a batch of supplied key/value messages. Results are returned in order of writing (which may vary from order of submission).
@@ -169,7 +169,7 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     ///    Note that the delivery and/or write order may vary from the supplied order unless `maxInFlight` is 1 (which massively constrains throughput).
     ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.
     /// </remarks>
-    member __.ProduceBatch(messageBatch : Message<_, _>[]) : Async<DeliveryReport<string,string>[]> = async {
+    member _.ProduceBatch(messageBatch : Message<_, _>[]) : Async<DeliveryReport<string,string>[]> = async {
         if Array.isEmpty messageBatch then return [||] else
 
         let! ct = Async.CancellationToken
@@ -187,7 +187,7 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
                 tcs.TrySetException errorMsg |> ignore
             else
                 let i = Interlocked.Increment numCompleted
-                results.[i - 1] <- m
+                results[i - 1] <- m
                 if i = numMessages then tcs.TrySetResult results |> ignore 
 
         for message in messageBatch do
@@ -200,15 +200,15 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     /// Produces a batch of supplied key/value messages. 
     /// See the other overload.
     /// </summary>
-    member __.ProduceBatch(messageBatch : seq<string * string>) : Async<DeliveryReport<string,string>[]> = 
-        __.ProduceBatch([| for pair in messageBatch -> Message.create pair |])
+    member p.ProduceBatch(messageBatch : seq<string * string>) : Async<DeliveryReport<string,string>[]> = 
+        p.ProduceBatch([| for pair in messageBatch -> Message.create pair |])
 
     /// <summary>
     /// Produces a batch of messages with supplied key/value/headers. 
     /// See the other overload.
     /// </summary>
-    member __.ProduceBatch(messageBatch : seq<string * string * seq<string * byte[]>>) : Async<DeliveryReport<string,string>[]> = 
-        __.ProduceBatch([| for pair in messageBatch -> Message.createWithHeaders pair |])
+    member p.ProduceBatch(messageBatch : seq<string * string * seq<string * byte[]>>) : Async<DeliveryReport<string,string>[]> = 
+        p.ProduceBatch([| for pair in messageBatch -> Message.createWithHeaders pair |])
         
     /// Creates and wraps a Confluent.Kafka Producer that affords a best effort batched production mode.
     /// NB See caveats on the `ProduceBatch` API for further detail as to the semantics
@@ -237,10 +237,10 @@ module Core =
 
         let mutable inFlightBytes = 0L
 
-        member __.InFlightMb = float inFlightBytes / 1024. / 1024.
-        member __.Delta(numBytes : int64) = Interlocked.Add(&inFlightBytes, numBytes) |> ignore
-        member __.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
-        member __.AwaitThreshold(ct : CancellationToken, consumer : IConsumer<_,_>, ?busyWork) =
+        member _.InFlightMb = float inFlightBytes / 1024. / 1024.
+        member _.Delta(numBytes : int64) = Interlocked.Add(&inFlightBytes, numBytes) |> ignore
+        member _.IsOverLimitNow() = Volatile.Read(&inFlightBytes) > maxInFlightBytes
+        member c.AwaitThreshold(ct : CancellationToken, consumer : IConsumer<_,_>, ?busyWork) =
             // Avoid having our assignments revoked due to MAXPOLL (exceeding max.poll.interval.ms between calls to .Consume)
             let showConsumerWeAreStillAlive () =
                 let tps = consumer.Assignment
@@ -248,7 +248,7 @@ module Core =
                 match busyWork with Some f -> f () | None -> ()
                 let _ = consumer.Consume(1)
                 consumer.Resume(tps)
-            if __.IsOverLimitNow() then
+            if c.IsOverLimitNow() then
                 log.ForContext("maxB", maxInFlightBytes).Information("Consuming... breached in-flight message threshold (now ~{currentB:n0}B), quiescing until it drops to < ~{minMb:n1}MiB",
                     inFlightBytes, float minInFlightBytes / 1024. / 1024.)
                 while Volatile.Read(&inFlightBytes) > minInFlightBytes && not ct.IsCancellationRequested do
@@ -258,46 +258,46 @@ module Core =
 /// See https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md for documentation on the implications of specific settings
 [<NoComparison>]
 type KafkaConsumerConfig = private { inner: ConsumerConfig; topics: string list; buffering: Core.ConsumerBufferingConfig } with
-    member __.Buffering = __.buffering
-    member __.Inner = __.inner
-    member __.Topics = __.topics
+    member x.Buffering = x.buffering
+    member x.Inner = x.inner
+    member x.Topics = x.topics
 
     /// Builds a Kafka Consumer Config suitable for KafkaConsumer.Start*
     static member Create
-        (   /// Identify this consumer in logs etc
+        (   // Identify this consumer in logs etc
             clientId : string, bootstrapServers : string, topics,
-            /// Consumer group identifier.
+            // Consumer group identifier.
             groupId,
-            /// Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest.
+            // Specifies handling when Consumer Group does not yet have an offset recorded. Confluent.Kafka default: start from Latest.
             autoOffsetReset,
-            /// Default 100kB. Confluent.Kafka default: 500MB
+            // Default 100kB. Confluent.Kafka default: 500MB
             ?fetchMaxBytes,
-            /// Default: use `fetchMaxBytes` value (or its default, 100kB). Confluent.Kafka default: 1mB
+            // Default: use `fetchMaxBytes` value (or its default, 100kB). Confluent.Kafka default: 1mB
             ?messageMaxBytes,
-            /// Minimum number of bytes to wait for (subject to timeout with default of 100ms). Default 1B.
+            // Minimum number of bytes to wait for (subject to timeout with default of 100ms). Default 1B.
             ?fetchMinBytes,
-            /// Stats reporting interval for the consumer. Default: no reporting.
+            // Stats reporting interval for the consumer. Default: no reporting.
             ?statisticsInterval,
-            /// Consumed offsets commit interval. Default 5s.
+            // Consumed offsets commit interval. Default 5s.
             ?autoCommitInterval,
-            /// Override default policy wrt auto-creating topics. Confluent.Kafka < 1.5 default: true; Confluent.Kafka >= 1.5 default: false
+            // Override default policy wrt auto-creating topics. Confluent.Kafka < 1.5 default: true; Confluent.Kafka >= 1.5 default: false
             ?allowAutoCreateTopics,
-            /// Misc configuration parameters to be passed to the underlying CK consumer. Same as constructor argument for Confluent.Kafka >=1.2.
+            // Misc configuration parameters to be passed to the underlying CK consumer. Same as constructor argument for Confluent.Kafka >=1.2.
             ?config : IDictionary<string,string>,
-            /// Misc configuration parameter to be passed to the underlying CK consumer.
+            // Misc configuration parameter to be passed to the underlying CK consumer.
             ?custom : #seq<KeyValuePair<string, string>>,
-            /// Postprocesses the ConsumerConfig after the rest of the rules have been applied
+            // Postprocesses the ConsumerConfig after the rest of the rules have been applied
             ?customize : ConsumerConfig -> unit,
 
             (* Client-side batching / limiting of reading ahead to constrain memory consumption *)
 
-            /// Minimum total size of consumed messages in-memory for the consumer to attempt to fill. Default 2/3 of maxInFlightBytes.
+            // Minimum total size of consumed messages in-memory for the consumer to attempt to fill. Default 2/3 of maxInFlightBytes.
             ?minInFlightBytes,
-            /// Maximum total size of consumed messages in-memory before broker polling is throttled. Default 24MiB.
+            // Maximum total size of consumed messages in-memory before broker polling is throttled. Default 24MiB.
             ?maxInFlightBytes,
-            /// Message batch linger time. Default 500ms.
+            // Message batch linger time. Default 500ms.
             ?maxBatchDelay,
-            /// Maximum number of messages to group per batch on consumer callbacks for BatchedConsumer. Default 1000.
+            // Maximum number of messages to group per batch on consumer callbacks for BatchedConsumer. Default 1000.
             ?maxBatchSize) =
         let maxInFlightBytes = defaultArg maxInFlightBytes (16L * 1024L * 1024L)
         let minInFlightBytes = defaultArg minInFlightBytes (maxInFlightBytes * 2L / 3L)
@@ -410,9 +410,9 @@ module private ConsumerImpl =
 
             while i < n && not cts.IsCancellationRequested do
                 if bc.TryTake(&t, 5 (* ms *)) then
-                    buffer.[i] <- t ; i <- i + 1
+                    buffer[i] <- t ; i <- i + 1
                     while i < n && not cts.IsCancellationRequested && bc.TryTake(&t) do 
-                        buffer.[i] <- t ; i <- i + 1
+                        buffer[i] <- t ; i <- i + 1
             i
 
     type PartitionedBlockingCollection<'Key, 'Message when 'Key : equality>(?perPartitionCapacity : int) =
@@ -425,9 +425,9 @@ module private ConsumerImpl =
             | Some c -> new BlockingCollection<'Message>(boundedCapacity=c)
 
         [<CLIEvent>]
-        member __.OnPartitionAdded = onPartitionAdded.Publish
+        member _.OnPartitionAdded = onPartitionAdded.Publish
 
-        member __.Add (key : 'Key, message : 'Message) =
+        member _.Add (key : 'Key, message : 'Message) =
             let factory key = lazy(
                 let coll = createCollection()
                 onPartitionAdded.Trigger(key, coll)
@@ -436,7 +436,7 @@ module private ConsumerImpl =
             let buffer = collections.GetOrAdd(key, factory)
             buffer.Value.Add message
 
-        member __.Revoke(key : 'Key) =
+        member _.Revoke(key : 'Key) =
             match collections.TryRemove key with
             | true, coll -> Task.Delay(10000).ContinueWith(fun _ -> coll.Value.CompleteAdding()) |> ignore
             | _ -> ()
@@ -458,7 +458,7 @@ module private ConsumerImpl =
             let buffer = Array.zeroCreate buf.maxBatchSize
             let nextBatch () =
                 let count = collection.FillBuffer(buffer, buf.maxBatchDelay)
-                let batch = Array.init count (fun i -> buffer.[i])
+                let batch = Array.init count (fun i -> buffer[i])
                 Array.Clear(buffer, 0, count)
                 batch
 
@@ -505,7 +505,7 @@ module private ConsumerImpl =
                         counter.Delta(+approximateMessageBytes result)
                         partitionedCollection.Add(result.TopicPartition, result)
                 with| :? ConsumeException as e -> log.Warning(e, "Consuming... exception {name}", consumer.Name)
-                    | :? System.OperationCanceledException -> log.Warning("Consuming... cancelled {name}", consumer.Name)
+                    | :? OperationCanceledException -> log.Warning("Consuming... cancelled {name}", consumer.Name)
         finally
             consumer.Close()
 
@@ -517,17 +517,17 @@ module private ConsumerImpl =
 /// (parallel across partitions, sequenced/monotonic within) batch of processing carried out by the `partitionHandler`
 /// Conclusion of the processing (when a `partitionHandler` throws and/or `Stop()` is called) can be awaited via <c>AwaitShutdown</c> or <c>AwaitWithStopOnCancellation</c>.
 type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<unit>, triggerStop) =
-    member __.Inner = inner
+    member _.Inner = inner
 
-    interface IDisposable with member __.Dispose() = __.Stop()
+    interface IDisposable with member x.Dispose() = x.Stop()
     /// Request cancellation of processing
-    member __.Stop() =  triggerStop ()
+    member _.Stop() =  triggerStop ()
     /// Inspects current status of processing task
-    member __.Status = task.Status
-    member __.RanToCompletion = task.Status = TaskStatus.RanToCompletion
+    member _.Status = task.Status
+    member _.RanToCompletion = task.Status = TaskStatus.RanToCompletion
     /// Asynchronously awaits until consume loop stops or is faulted. <br/>
     /// NOTE: does not Stop the consumer in response to Cancellation; see <c>AwaitWithStopOnCancellation</c> for such a mechanism
-    member __.AwaitShutdown() =
+    member _.AwaitShutdown() =
         // NOTE NOT Async.AwaitTask task, or we'd hang in the case of Cancellation via `Stop()`
         Async.AwaitTaskCorrect task
     /// Asynchronously awaits until this consumer stops or is faulted.<br/>
