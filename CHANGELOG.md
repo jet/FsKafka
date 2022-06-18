@@ -16,6 +16,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 
 - Update global.json to use SDK version `6.0.300`, use `DotNet.ReproducibleBuilds` [#90](https://github.com/jet/FsKafka/pull/90) [#93](https://github.com/jet/FsKafka/pull/93)
+- Target [`Confluent.Kafka [1.9.0]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#190), [`librdkafka.redist [1.9.0]`](https://github.com/edenhill/librdkafka/releases/tag/v1.9.0) [#91](https://github.com/jet/FsKafka/pull/91)
 
 ### Removed
 ### Fixed
