@@ -52,11 +52,7 @@ module Helpers =
 
     type Async with
 
-        // Unsafe in the name re https://github.com/dotnet/fsharp/issues/13165
-        // Reasonable in the context of this codebase as we do not exceed 1200 computations
-        // When there's an in-the-box ParallelThrottled, or this codebase is known to target an FSharp.Core that does not suffer from this issue,
-        // the Unsafe part of the name (and this note) can be removed 
-        static member ParallelThrottledUnsafe dop computations = 
+        static member ParallelThrottled dop computations = 
             Async.Parallel(computations, maxDegreeOfParallelism = dop)
 
     type BatchedConsumer with
@@ -75,7 +71,7 @@ module Helpers =
         consumerId : int 
         result : ConsumeResult<string,string>
         payload : TestMessage
-        headers: MessageHeaders
+        headers : MessageHeaders
     }
 
     type ConsumerCallback = BatchedConsumer -> ConsumedTestMessage [] -> Async<unit>
@@ -98,7 +94,7 @@ module Helpers =
                 )
                 |> Seq.chunkBySize 100
                 |> Seq.map producer.ProduceBatch
-                |> Async.ParallelThrottledUnsafe 7
+                |> Async.ParallelThrottled 7
 
             return Array.concat results
         }
