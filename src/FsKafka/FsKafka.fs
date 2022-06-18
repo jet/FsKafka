@@ -544,7 +544,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
     static member Start(log : ILogger, config : KafkaConsumerConfig, partitionHandler : ConsumeResult<string,string>[] -> Async<unit>) =
         if List.isEmpty config.topics then invalidArg "config" "must specify at least one topic"
         log.Information("Consuming... {bootstrapServers} {topics} {groupId} autoOffsetReset={autoOffsetReset} fetchMaxBytes={fetchMaxB} maxInFlight={maxInFlightMb:n1}MiB maxBatchDelay={maxBatchDelay}s maxBatchSize={maxBatchSize}",
-            config.inner.BootstrapServers, config.topics, config.inner.GroupId, (let x = config.inner.AutoOffsetReset in x.Value), config.inner.FetchMaxBytes,
+            config.inner.BootstrapServers, Seq.ofList config.topics, config.inner.GroupId, (let x = config.inner.AutoOffsetReset in x.Value), config.inner.FetchMaxBytes,
             float config.buffering.maxInFlightBytes / 1024. / 1024., (let t = config.buffering.maxBatchDelay in t.TotalSeconds), config.buffering.maxBatchSize)
         let partitionedCollection = ConsumerImpl.PartitionedBlockingCollection<TopicPartition, ConsumeResult<string, string>>()
         let onRevoke (xs : seq<TopicPartitionOffset>) = 

@@ -38,7 +38,6 @@ module Helpers =
 
     let createLogger sink =
         LoggerConfiguration()
-            .Destructure.FSharpTypes()
             .WriteTo.Sink(sink)
             .WriteTo.Seq("http://localhost:5341")
             .CreateLogger()
