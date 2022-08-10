@@ -17,6 +17,13 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+<a name="1.9.2"></a>
+## [1.9.2] - 2022-08-10
+
+### Changed
+
+- Target [`Confluent.Kafka [1.9.2]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#192), [`librdkafka.redist [1.9.2]`](https://github.com/edenhill/librdkafka/releases/tag/v1.9.2) [#92](https://github.com/jet/FsKafka/pull/92)
+
 <a name="1.9.0"></a>
 ## [1.9.0] - 2022-06-18
 
