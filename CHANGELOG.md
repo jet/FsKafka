@@ -17,6 +17,9 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Removed
 ### Fixed
 
+<a name="1.9.2"></a>
+## [1.9.2] - 2022-08-10
+
 ### Changed
 
 - Target [`Confluent.Kafka [1.9.2]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#192), [`librdkafka.redist [1.9.2]`](https://github.com/edenhill/librdkafka/releases/tag/v1.9.2) [#95](https://github.com/jet/FsKafka/pull/95)
@@ -485,7 +488,8 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 (Stripped down repo for history purposes, see [`v0` branch](tree/v0) for implementation targeting `Confluent.Kafka` v `0.9.4`)
 
-[Unreleased]: https://github.com/jet/FsKafka/compare/1.9.0...HEAD
+[Unreleased]: https://github.com/jet/FsKafka/compare/1.9.2...HEAD
+[1.9.2]: https://github.com/jet/FsKafka/compare/1.9.0...1.9.2
 [1.9.0]: https://github.com/jet/FsKafka/compare/1.7.0...1.9.0
 [1.7.0]: https://github.com/jet/FsKafka/compare/1.6.3...1.7.0
 [1.6.3]: https://github.com/jet/FsKafka/compare/1.6.2...1.6.3
