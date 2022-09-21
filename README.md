@@ -2,14 +2,18 @@
 
 F# friendly wrapper for `Confluent.Kafka`, with minimal dependencies or additional abstractions (but see [related repos](#related-repos)). 
 
-`FsKafka` wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. [Depends](https://www.fuget.org/packages/FsKafka) on [`Confluent.Kafka [1.9.0]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#190), [`librdkafka.redist [1.9.0]`](https://github.com/edenhill/librdkafka/releases/tag/v1.9.0) (pinned to ensure we use a tested pairing), `Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and `Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
+`FsKafka` wraps `Confluent.Kafka` to provide efficient batched Kafka Producer and Consumer configurations with basic logging instrumentation. [Depends](https://www.fuget.org/packages/FsKafka) on 
+[`Confluent.Kafka [1.9.2]`](https://github.com/confluentinc/confluent-kafka-dotnet/blob/master/CHANGELOG.md#192),
+[`librdkafka.redist [1.9.2]`](https://github.com/edenhill/librdkafka/releases/tag/v1.9.2) (pinned to ensure we use a tested pairing),
+`Serilog` (but no specific Serilog sinks, i.e. you configure to emit to `NLog` etc) and
+`Newtonsoft.Json` (used internally to parse Broker-provided Statistics for logging purposes).
 
 ## Usage
 
 FsKafka is delivered as a [Nuget package](https://www.nuget.org/packages/FsKafka/) targeting `netstandard2.0` and F# >= 4.5.
 
-```powershell
-Install-Package FsKafka
+```bash
+dotnet add package FsKafka
 ```
 
 or for `paket`, use:
@@ -47,7 +51,7 @@ dotnet build build.proj -v n
 
 ## FAQ
 
-### How do I get rid of all the `breaking off polling` ... `resuming polling` spam?
+### How do I get rid of all ~~~~the `breaking off polling` ... `resuming polling` spam?
 
 - The `BatchedConsumer` implementation tries to give clear feedback as to when reading is not keeping up, for diagnostic purposes. As of [#32](https://github.com/jet/FsKafka/pull/32), such messages are tagged with the type `FsKafka.Core.InFlightMessageCounter`, and as such can be silenced by including the following in one's `LoggerConfiguration()`: 
 
