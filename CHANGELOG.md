@@ -15,7 +15,6 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 
 - Upgrade to .NET 8
-- Relax version constraints on `Confluent.Kafka` and `librdkafka.redist` [@njlr](https://github.com/njlr)
 
 ### Added
 ### Removed
