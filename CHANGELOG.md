@@ -12,8 +12,12 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ## [Unreleased]
 
-### Added
 ### Changed
+
+- Upgrade to .NET 8
+- Relax version constraints on `Confluent.Kafka` and `librdkafka.redist` [@njlr](https://github.com/njlr)
+
+### Added
 ### Removed
 ### Fixed
 
@@ -100,25 +104,25 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Fixed
 
-- Resolved Memory leak introduced in 1.5.3 [#79](https://github.com/jet/FsKafka/pull/79) :pray: [@wantastic84](https://github.com/wantastic84) 
+- Resolved Memory leak introduced in 1.5.3 [#79](https://github.com/jet/FsKafka/pull/79) :pray: [@wantastic84](https://github.com/wantastic84)
 
 <a name="1.5.3"></a>
 ## [1.5.3] - 2020-09-08
 
 ### Added
 
-- Logging of consume-loop terminating exceptions caught in the batch processing loop and/or handler [#78](https://github.com/jet/FsKafka/pull/78) :pray: [@wantastic84](https://github.com/wantastic84) 
+- Logging of consume-loop terminating exceptions caught in the batch processing loop and/or handler [#78](https://github.com/jet/FsKafka/pull/78) :pray: [@wantastic84](https://github.com/wantastic84)
 
 <a name="1.5.2"></a>
 ## [1.5.2] - 2020-08-19
 
 ### Changed
 
-- BREAKING: Renamed `FsKafka.KafkaMonitor.StartAsChild` to `Start`, changed return type to `IDisposable` [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84) 
+- BREAKING: Renamed `FsKafka.KafkaMonitor.StartAsChild` to `Start`, changed return type to `IDisposable` [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84)
 
 ### Fixed
 
-- Provided mechanism to tear down the monitoring loop when the consumer stops [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84) 
+- Provided mechanism to tear down the monitoring loop when the consumer stops [#77](https://github.com/jet/FsKafka/pull/77) :pray: [@wantastic84](https://github.com/wantastic84)
 
 <a name="1.5.1"></a>
 ## [1.5.1] - 2020-08-04
@@ -159,13 +163,13 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 
-- Add `.Verbose` log for handler invocations [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@wantastic84](https://github.com/wantastic84) 
+- Add `.Verbose` log for handler invocations [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@wantastic84](https://github.com/wantastic84)
 - include `partition` property as `LogContext.PushProperty` when dispatching a handler invocation [#60](https://github.com/jet/FsKafka/pull/60)
-- `FsKafka0`: Add ConsumerError logging [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
+- `FsKafka0`: Add ConsumerError logging [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade)
 
 ### Changed
 
-- `FsKafka`: Distinguish Fatal Errors from by non-fatal by reducing level to Warning [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
+- `FsKafka`: Distinguish Fatal Errors from by non-fatal by reducing level to Warning [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade)
 - Target `Confluent.Kafka [1.4.4]`, `librdkafka.redist [1.4.4]`
 
 ### Removed
@@ -205,12 +209,12 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Added
 
-- Add `.Verbose` log for handler invocations [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@wantastic84](https://github.com/wantastic84) 
-- FsKafka0: Add ConsumerError logging [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
+- Add `.Verbose` log for handler invocations [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@wantastic84](https://github.com/wantastic84)
+- FsKafka0: Add ConsumerError logging [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade)
 
 ### Changed
 
-- FsKafka: Distinguish Fatal Errors from by non-fatal by reducing level to Warning [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade) 
+- FsKafka: Distinguish Fatal Errors from by non-fatal by reducing level to Warning [#57](https://github.com/jet/FsKafka/pull/57) :pray: [@svairagade](https://github.com/svairagade)
 
 ### Fixed
 
@@ -276,7 +280,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 ### Changed
 
 - Renamed to `FsKafka`
-- Updated to `MinVer` v `2.0.0`, `Microsoft.SourceLink.GitHub` v `1.0.0` 
+- Updated to `MinVer` v `2.0.0`, `Microsoft.SourceLink.GitHub` v `1.0.0`
 - Updated to `Confluent.Kafka`, `librdkafka.redist` v `1.3.0`
 
 <a name="1.2.0"></a>
@@ -362,11 +366,11 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 ### Changed
 
 - Default `minInFlightBytes` is now 2/3 of `maxInFlightBytes`
-- Reduced `Thread.Sleep` when over `maxInFlightBytes` threshold from `5` to `1` ms 
+- Reduced `Thread.Sleep` when over `maxInFlightBytes` threshold from `5` to `1` ms
 
 ### Fixed
 
-- Significant tuning / throughput improvements for `ParallelConsumer` 
+- Significant tuning / throughput improvements for `ParallelConsumer`
 
 <a name="1.0.0-rc11"></a>
 ## [1.0.0-rc11] - 2019-05-27
@@ -377,7 +381,7 @@ _NOTE: not interoperable (i.e., via a binding redirect) with CK 1.1 due to a bre
 
 ### Fixed
 
-- reinstated `AutoOffsetReset` logging in `KafkaConsumerConfig` 
+- reinstated `AutoOffsetReset` logging in `KafkaConsumerConfig`
 
 <a name="1.0.0-rc10"></a>
 ## [1.0.0-rc10] - 2019-05-22
