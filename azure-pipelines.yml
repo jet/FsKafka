@@ -51,6 +51,6 @@ jobs:
     displayName: 'Install .NET Core sdk'
     inputs:
       packageType: sdk
-      version: 8.x
+      useGlobalJson: true
   - script: dotnet pack build.proj
     displayName: dotnet pack build.proj
