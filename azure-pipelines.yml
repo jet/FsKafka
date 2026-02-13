@@ -3,7 +3,7 @@ name: $(Rev:r)
 # Summary:
 #	Linux: Tests using docker Kafka instance (note test suite does not run net framework as CK on mono is not supported)
 #	Windows: Builds and emits nupkg as artifacts
-#	MacOS: Builds only 
+#	MacOS: Builds only
 
 jobs:
 - job: Windows
@@ -14,12 +14,12 @@ jobs:
     displayName: dotnet pack build.proj
     env:
       BUILD_PR: $(SYSTEM.PULLREQUEST.PULLREQUESTNUMBER)
-      BUILD_ID: $(BUILD.BUILDNUMBER) 
+      BUILD_ID: $(BUILD.BUILDNUMBER)
   - task: PublishBuildArtifacts@1
     inputs:
       pathtoPublish: 'bin'
       artifactName: 'nupkgs'
-      
+
 - job: Linux
   pool:
     vmImage: 'ubuntu-latest'
@@ -42,7 +42,7 @@ jobs:
         testResultsFormat: 'VSTest'
         testResultsFiles: 'tests/**/*.trx'
       condition: succeededOrFailed()
-      
+
 - job: MacOS
   pool:
     vmImage: 'macOS-latest'
@@ -51,6 +51,6 @@ jobs:
     displayName: 'Install .NET Core sdk'
     inputs:
       packageType: sdk
-      version: 6.x
+      useGlobalJson: true
   - script: dotnet pack build.proj
     displayName: dotnet pack build.proj
