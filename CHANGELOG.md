@@ -14,6 +14,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Changed
 
+- Target `Newtonsoft.Json` v `13.0.1` (to remove insecure default)
 - Upgrade to .NET 8 [#96](https://github.com/jet/FsKafka/pull/96) :pray: [@njlr](https://github.com/njlr)
 
 ### Added
