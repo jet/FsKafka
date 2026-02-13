@@ -24,7 +24,7 @@ module Binding =
 type Batching =
     /// Produce individually, lingering for throughput+compression. Confluent.Kafka < 1.5 default: 0.5ms. Confluent.Kafka >= 1.5 default: 5ms
     | Linger of linger : TimeSpan
-    /// Use in conjunction with BatchedProducer.ProduceBatch to to obtain best-effort batching semantics (see comments in BatchedProducer for more detail)
+    /// Use in conjunction with BatchedProducer.ProduceBatch to obtain best-effort batching semantics (see comments in BatchedProducer for more detail)
     /// Uses maxInFlight=1 batch so failed transmissions should be much less likely to result in broker appending items out of order
     | BestEffortSerial of linger : TimeSpan
     /// Apply custom-defined settings. Not recommended.
@@ -116,7 +116,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// <summary> Produces a single message, yielding a response upon completion/failure of the ack (>3ms to complete)</summary>
     /// <remarks>
     /// There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
-    /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
+    /// Thus, it's critical to ensure you don't submit another message for the same key until you've had a success / failure 
     /// response from the call.
     /// </remarks>
     member _.ProduceAsync(message : Message<string, string>) : Async<DeliveryResult<string, string>> = async {
@@ -126,7 +126,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// <summary> Produces a single message, yielding a response upon completion/failure of the ack (>3ms to complete)</summary>
     /// <remarks>
     /// There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
-    /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
+    /// Thus, it's critical to ensure you don't submit another message for the same key until you've had a success / failure 
     /// response from the call.
     /// </remarks>
     member p.ProduceAsync(key : string, value: string, headers : seq<string * byte[]>) : Async<DeliveryResult<string, string>> =
@@ -136,7 +136,7 @@ type KafkaProducer private (inner : IProducer<string, string>, topic : string) =
     /// <summary> Produces a single message, yielding a response upon completion/failure of the ack (>3ms to complete)</summary>
     /// <remarks>
     /// There's no assurance of ordering [without dropping `maxInFlight` down to `1` and annihilating throughput].
-    /// Thus its critical to ensure you don't submit another message for the same key until you've had a success / failure 
+    /// Thus, it's critical to ensure you don't submit another message for the same key until you've had a success / failure 
     /// response from the call.
     /// </remarks>
     member p.ProduceAsync(key : string, value : string) : Async<DeliveryResult<string, string>> =
@@ -167,7 +167,7 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     ///    2. upon receipt of the first failed `DeliveryReport` (NB without waiting for any further reports, which can potentially leave some results in doubt should a 'batch' get split) </throws>
     /// <remarks>
     ///    Note that the delivery and/or write order may vary from the supplied order unless `maxInFlight` is 1 (which massively constrains throughput).
-    ///    Thus it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.
+    ///    Thus, it's important to note that supplying >1 item into the queue bearing the same key without maxInFlight=1 risks them being written out of order onto the topic.
     /// </remarks>
     member _.ProduceBatch(messageBatch : Message<_, _>[]) : Async<DeliveryReport<string,string>[]> = async {
         if Array.isEmpty messageBatch then return [||] else
@@ -210,7 +210,7 @@ type BatchedProducer private (inner : IProducer<string, string>, topic : string)
     member p.ProduceBatch(messageBatch : seq<string * string * seq<string * byte[]>>) : Async<DeliveryReport<string,string>[]> = 
         p.ProduceBatch([| for pair in messageBatch -> Message.createWithHeaders pair |])
         
-    /// Creates and wraps a Confluent.Kafka Producer that affords a best effort batched production mode.
+    /// Creates and wraps a Confluent.Kafka Producer, providing a best-effort batched production mode.
     /// NB See caveats on the `ProduceBatch` API for further detail as to the semantics
     /// Throws ArgumentOutOfRangeException if config has a non-zero linger value as this is absolutely critical to the semantics
     static member Create(log : ILogger, config : KafkaProducerConfig, topic : string) =
@@ -560,7 +560,7 @@ type BatchedConsumer private (inner : IConsumer<string, string>, task : Task<uni
         consumer.Subscribe config.topics
         c
 
-    /// Starts a Kafka consumer instance that schedules handlers grouped by message key. Additionally accepts a global degreeOfParallelism parameter
+    /// Starts a Kafka consumer instance that schedules handlers grouped by message key. Additionally,g accepts a global degreeOfParallelism parameter
     /// that controls the number of handlers running concurrently across partitions for the given consumer instance.
     static member StartByKey(log: ILogger, config : KafkaConsumerConfig, degreeOfParallelism : int, keyHandler : ConsumeResult<_,_> [] -> Async<unit>) =
         let semaphore = new SemaphoreSlim(degreeOfParallelism)

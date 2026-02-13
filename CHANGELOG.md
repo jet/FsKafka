@@ -14,7 +14,7 @@ The `Unreleased` section name is replaced by the expected version of next releas
 
 ### Changed
 
-- Upgrade to .NET 8
+- Upgrade to .NET 8 [#96](https://github.com/jet/FsKafka/pull/96) :pray: [@njlr](https://github.com/njlr)
 
 ### Added
 ### Removed
