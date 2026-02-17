@@ -26,24 +26,24 @@ jobs:
   strategy:
     maxParallel: 2
     matrix:
-      Stable_Global:
-        _dotnetConfig: 'global'
-      Preview_Net10:
-        _dotnetConfig: 'net10'
+      GlobalJson:
+        dotnetGlobalJson: true
+      Net10:
+        dotnetGlobalJson: false
+        dotnetVersion: '10.x'
   steps:
     - task: UseDotNet@2
       displayName: 'Install .NET SDK (global.json)'
-      condition: eq(variables['_dotnetConfig'], 'global')
+      condition: eq(variables['dotnetGlobalJson'], 'true')
       inputs:
         packageType: sdk
         useGlobalJson: true
     - task: UseDotNet@2
-      displayName: 'Install .NET 10 SDK'
-      condition: eq(variables['_dotnetConfig'], 'net10')
+      displayName: 'Install .NET SDK'
+      condition: eq(variables['dotnetGlobalJson'], 'false')
       inputs:
         packageType: sdk
-        version: '10.x'
-        includePreviewVersions: true
+        version: $(dotnetVersion)
     - script: |
         docker network create kafka-net
         docker run -d --name zookeeper --network kafka-net --publish 2181:2181 zookeeper:3.4
