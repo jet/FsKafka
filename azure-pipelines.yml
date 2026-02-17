@@ -23,45 +23,35 @@ jobs:
 - job: Linux
   pool:
     vmImage: 'ubuntu-latest'
-  strategy:
-    maxParallel: 2
-    matrix:
-      GlobalJson:
-        dotnetGlobalJson: true
-      Net10:
-        dotnetGlobalJson: false
-        dotnetVersion: '10.x'
   steps:
-    - task: UseDotNet@2
-      displayName: 'Install .NET SDK (global.json)'
-      condition: eq(variables['dotnetGlobalJson'], 'true')
-      inputs:
-        packageType: sdk
-        useGlobalJson: true
-    - task: UseDotNet@2
-      displayName: 'Install .NET SDK'
-      condition: eq(variables['dotnetGlobalJson'], 'false')
-      inputs:
-        packageType: sdk
-        version: $(dotnetVersion)
-    - script: |
-        docker network create kafka-net
-        docker run -d --name zookeeper --network kafka-net --publish 2181:2181 zookeeper:3.4
-        docker run -d --name kafka --network kafka-net --hostname localhost --publish 9092:9092 \
-            --env KAFKA_ADVERTISED_HOST_NAME=127.0.0.1 --env ZOOKEEPER_IP=zookeeper \
-            --env KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
-            ches/kafka
-        sleep 15
-      displayName: Docker kafka for integration tests
-    - script: dotnet test build.proj -v d
-      displayName: Run Integration tests
-      env:
-        TEST_KAFKA_BROKER: localhost:9092
-    - task: PublishTestResults@2
-      inputs:
-        testResultsFormat: 'VSTest'
-        testResultsFiles: 'tests/**/*.trx'
-      condition: succeededOrFailed()
+  - task: UseDotNet@2
+    displayName: 'Install .NET SDK (global.json)'
+    inputs:
+      packageType: sdk
+      useGlobalJson: true
+  - task: UseDotNet@2
+    displayName: 'Install .NET SDK 10.x'
+    inputs:
+      packageType: sdk
+      version: 10.x
+  - script: |
+      docker network create kafka-net
+      docker run -d --name zookeeper --network kafka-net --publish 2181:2181 zookeeper:3.4
+      docker run -d --name kafka --network kafka-net --hostname localhost --publish 9092:9092 \
+          --env KAFKA_ADVERTISED_HOST_NAME=127.0.0.1 --env ZOOKEEPER_IP=zookeeper \
+          --env KAFKA_AUTO_CREATE_TOPICS_ENABLE=true \
+          ches/kafka
+      sleep 15
+    displayName: Docker kafka for integration tests
+  - script: dotnet test build.proj -v d
+    displayName: Run Integration tests
+    env:
+      TEST_KAFKA_BROKER: localhost:9092
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: 'tests/**/*.trx'
+    condition: succeededOrFailed()
 
 - job: MacOS
   pool:
@@ -69,15 +59,13 @@ jobs:
   steps:
   - task: UseDotNet@2
     displayName: 'Install .NET SDK (global.json)'
-    condition: eq(variables['dotnetGlobalJson'], 'true')
     inputs:
       packageType: sdk
       useGlobalJson: true
   - task: UseDotNet@2
-    displayName: 'Install .NET SDK'
-    condition: eq(variables['dotnetGlobalJson'], 'false')
+    displayName: 'Install .NET SDK 10.x'
     inputs:
       packageType: sdk
-      version: $(dotnetVersion)
+      version: 10.x
   - script: dotnet pack build.proj
     displayName: dotnet pack build.proj
