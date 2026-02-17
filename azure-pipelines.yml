@@ -6,19 +6,19 @@ name: $(Rev:r)
 #	MacOS: Builds only
 
 jobs:
-# - job: Windows
-#   pool:
-#     vmImage: 'windows-latest'
-#   steps:
-#   - script: dotnet pack build.proj
-#     displayName: dotnet pack build.proj
-#     env:
-#       BUILD_PR: $(SYSTEM.PULLREQUEST.PULLREQUESTNUMBER)
-#       BUILD_ID: $(BUILD.BUILDNUMBER)
-#   - task: PublishBuildArtifacts@1
-#     inputs:
-#       pathtoPublish: 'bin'
-#       artifactName: 'nupkgs'
+- job: Windows
+  pool:
+    vmImage: 'windows-latest'
+  steps:
+  - script: dotnet pack build.proj
+    displayName: dotnet pack build.proj
+    env:
+      BUILD_PR: $(SYSTEM.PULLREQUEST.PULLREQUESTNUMBER)
+      BUILD_ID: $(BUILD.BUILDNUMBER)
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: 'bin'
+      artifactName: 'nupkgs'
 
 - job: Linux
   pool:
@@ -63,14 +63,21 @@ jobs:
         testResultsFiles: 'tests/**/*.trx'
       condition: succeededOrFailed()
 
-# - job: MacOS
-#   pool:
-#     vmImage: 'macOS-latest'
-#   steps:
-#   - task: UseDotNet@2
-#     displayName: 'Install .NET Core sdk'
-#     inputs:
-#       packageType: sdk
-#       useGlobalJson: true
-#   - script: dotnet pack build.proj
-#     displayName: dotnet pack build.proj
+- job: MacOS
+  pool:
+    vmImage: 'macOS-latest'
+  steps:
+  - task: UseDotNet@2
+    displayName: 'Install .NET SDK (global.json)'
+    condition: eq(variables['dotnetGlobalJson'], 'true')
+    inputs:
+      packageType: sdk
+      useGlobalJson: true
+  - task: UseDotNet@2
+    displayName: 'Install .NET SDK'
+    condition: eq(variables['dotnetGlobalJson'], 'false')
+    inputs:
+      packageType: sdk
+      version: $(dotnetVersion)
+  - script: dotnet pack build.proj
+    displayName: dotnet pack build.proj
