@@ -28,9 +28,9 @@ jobs:
       CK_1_9_2:
         ConfluentKafkaVersion: '1.9.2'
         LibrdkafkaRedistVersion: '1.9.2'
-      CK_2_14_0:
-        ConfluentKafkaVersion: '2.14.0'
-        LibrdkafkaRedistVersion: '2.14.0'
+      CK_2_15_0:
+        ConfluentKafkaVersion: '2.15.0'
+        LibrdkafkaRedistVersion: '2.15.0'
   steps:
   - task: UseDotNet@2
     displayName: 'Install .NET SDK (global.json)'
